@@ -218,6 +218,24 @@ class Board:
                 self.num_unprotested_trees -= 1
             square += direction
 
+    def _protest(self, opponent_index):
+        # Find closest tree to targeted opponent
+        trees, protesters = self.board[2:4]
+        opponent_y, opponent_x = self.player_positions[1 + opponent_index]
+        min_dist, min_y, min_x = 999, None, None
+        for y in range(5):
+            for x in range(5):
+                if trees[y, x] != 1 or protesters[y, x] == 1:
+                    continue
+                dy, dx = opponent_y - y, opponent_x - x
+                dist = dy*dy + dx*dx
+                if dist < min_dist:
+                    min_dist, min_y, min_x = dist, y, x
+
+        # Place protester and decrement protester count
+        self.player_layers[0][2] -= 1
+        protesters[min_y, min_x] = 1
+
 
 if __name__ == '__main__':
 
