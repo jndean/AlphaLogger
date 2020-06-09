@@ -73,7 +73,7 @@ class Board:
         self.num_unprotested_trees, self.player_layers = None, None
 
     def reset(self, player_positions=None):
-        self.board = np.full((3 * self.num_players + 4, 5, 5), -1)
+        self.board = np.full((4, 5, 5), -1)
         self.player_layers = deque(np.full((3, 5, 5), -1) for _ in range(self.num_players))
         self.unoccupied = np.full((5, 5), True)
         self.num_unprotested_trees = 0
@@ -124,7 +124,7 @@ class Board:
         # Then compute the legal actions following legal motions
         legal_moves = np.full((self.num_moves,), False)
         block_idxs = range(0, self.num_moves, self.num_actions)
-        tree_layer, protester_layer = self.board[2:4]
+        tree2_layer, tree3_layer, protester_layer = self.board[1:4]
         for block_start, player_pos, legal_motion in zip(block_idxs, new_positions, legal_motions):
             if not legal_motion:
                 continue
@@ -135,9 +135,10 @@ class Board:
                 if not _within_bounds(square):
                     continue
                 square = tuple(square)
-                # ... can chop a mature tree if it's there
+                # ... can chop a mature tree if it's there (or will be there after grow)
                 legal_moves[block_start + dir_idx] = (
-                        protester_layer[square] != 1 and tree_layer[square] == 1
+                    tree2_layer[square] == 1 or
+                    (protester_layer[square] != 1 and tree3_layer[square] == 1)
                 )
                 # ... can plant a sapling if the square is empty
                 legal_moves[block_start + dir_idx + 4] = unoccupied[square]
