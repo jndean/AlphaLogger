@@ -93,10 +93,7 @@ class Board:
         self._update_legal_moves()
 
     def get_state(self):
-        ret = np.empty_like(self.board)
-        ret[:4] = self.board[:4]
-        ret[4:] = np.vstack(self.player_layers)
-        return ret
+        return np.vstack([self.board] + list(self.player_layers))
 
     def get_legal_moves(self):
         return self.legal_moves
@@ -156,8 +153,10 @@ class Board:
         # Move player
         position = self.player_positions[0]
         self.player_layers[0][0, position[0], position[1]] = -1
+        self.unoccupied[position[0], position[1]] = True
         position += Board.motions[move // self.num_actions]
         self.player_layers[0][0, position[0], position[1]] = 1
+        self.unoccupied[position[0], position[1]] = False
         self._grow()
 
         # Perform action
@@ -252,6 +251,7 @@ if __name__ == '__main__':
     print(game.get_state())
     print(game.get_legal_moves().reshape((13, -1)))
 
+    quit()
     print(game.player_positions[0])
     print(Board.corners)
     game.player_positions[0] += np.array([1, 1])
