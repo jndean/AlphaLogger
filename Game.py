@@ -131,17 +131,26 @@ class Board:
             for dir_idx, square in enumerate(player_pos + Board.directions):
                 if not _within_bounds(square):
                     continue
-                square = tuple(square)
+                sqr = tuple(square)
                 # ... can chop a mature tree if it's there (or will be there after grow)
                 legal_moves[block_start + dir_idx] = (
-                    tree2_layer[square] == 1 or
-                    (protester_layer[square] != 1 and tree3_layer[square] == 1)
+                    tree2_layer[sqr] == 1 or
+                    (protester_layer[sqr] != 1 and tree3_layer[sqr] == 1)
                 )
                 # ... can plant a sapling if the square is empty
-                legal_moves[block_start + dir_idx + 4] = unoccupied[square]
+                # (the square after can't be mature, else a new sapling will be here after movement)
+                next_sqr = tuple(square + Board.directions[dir_idx])
+                legal_moves[block_start + dir_idx + 4] = (
+                    unoccupied[sqr] and
+                    (not _within_bounds(next_sqr) or tree3_layer[next_sqr] == -1)
+                )
 
             # Can play protester if you have one and there's a suitable tree
-            if self.player_layers[0][2][0][0] > 0 and self.num_unprotested_trees > 0:
+            if self.player_layers[0][2][0][0] > 0 and (
+                    self.num_unprotested_trees > 0 or
+                    np.sum(tree2_layer[player_pos[0], :]) != -5 or
+                    np.sum(tree2_layer[:, player_pos[1]]) != -5
+            ):
                 legal_moves[block_start + 8: block_end] = True
             # Must can pass if there are no available actions
             legal_moves[block_end] = not np.any(legal_moves[block_start: block_end])
