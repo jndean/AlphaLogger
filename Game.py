@@ -95,9 +95,6 @@ class Board:
     def get_state(self):
         return np.vstack([self.board] + list(self.player_layers))
 
-    def get_legal_moves(self):
-        return self.legal_moves
-
     def _update_legal_moves(self):
         # Temporarily make the current spot empty
         unoccupied = self.unoccupied
@@ -177,10 +174,19 @@ class Board:
         else:
             self._protest(action - 8)
 
+        # Check for winner
+        for i, layers in enumerate(self.player_layers):
+            if layers[1, 0, 0] >= 10:
+                ret = np.full((self.num_players,), -1)
+                ret[i] = 1
+                return ret
+
         # End move by changing player and caching the current legal moves
         self.player_layers.rotate(-1)
         self.player_positions.rotate(-1)
         self._update_legal_moves()
+
+        return None
 
     def _grow(self):
         next_trees = np.copy(self.board[:3])

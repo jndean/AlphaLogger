@@ -1,7 +1,8 @@
 from collections import deque
-from time import sleep
 import tkinter as tk
 import tkinter.font as font
+
+import numpy as np
 
 from Game import Board
 from Player import HumanPlayer, RandomPlayer
@@ -20,6 +21,7 @@ class MatchGUI:
         self.window, self.grid = None, None
         self.chosen_motion, self.chosen_action = None, None
 
+        self.game_over = False
         self.input_lock = False
         self.create_gui()
         self.draw()
@@ -109,7 +111,7 @@ class MatchGUI:
         self.input_lock = False
 
     def continue_game(self):
-        while True:
+        while not self.game_over:
             current_player = self.players[0]
             if isinstance(current_player, HumanPlayer):
                 if self.chosen_motion is None or self.chosen_action is None:
@@ -123,7 +125,15 @@ class MatchGUI:
                 move = current_player.choose_move(self.board)
 
             self.print(f'"{current_player.id}" plays {move}')
-            self.board.do_move(move)
+            final_scores = self.board.do_move(move)
+
+            if final_scores is not None:
+                self.draw()
+                winner = self.players[np.argmax(final_scores)]
+                self.print(f"{winner.id} wins!")
+                self.game_over = True
+                return
+
             self.players.rotate(-1)
             print(self.board.get_state())
             self.draw()
@@ -146,9 +156,11 @@ class MatchGUI:
                 else:
                     label = ""
                 self.grid[y][x]['text'] = label
-        for player, (y, x) in zip(self.players, self.board.player_positions):
-            self.grid[y][x]['text'] = player.id
-            print(player.id)
+        for player, (y, x), layers in zip(
+                self.players, self.board.player_positions, self.board.player_layers
+        ):
+            score, protesters = layers[1:, 0, 0]
+            self.grid[y][x]['text'] = f"{player.id}\n{score} ({protesters})"
 
 
 if __name__ == '__main__':
