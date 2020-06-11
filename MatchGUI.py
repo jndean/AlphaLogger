@@ -25,7 +25,6 @@ class MatchGUI:
         self.input_lock = False
         self.create_gui()
         self.draw()
-        self.continue_game()
         self.window.mainloop()
 
     def create_gui(self):
