@@ -11,8 +11,9 @@ class MatchGUI:
 
     def __init__(self, players):
         self.players = deque(players)
+        self.num_players = len(players)
 
-        self.board = Board(len(players))
+        self.board = Board(self.num_players)
         self.board.reset()
         self.num_actions = self.board.num_actions
 
@@ -77,6 +78,18 @@ class MatchGUI:
         tk.Label(text="PLANT", master=plant_frame).grid(row=1, column=1, padx=5, pady=5)
         plant_frame.grid(row=1, column=2)
 
+        extras_frame = tk.Frame(master=layout)
+        tk.Button(
+            text="No Action", width=12, height=1, master=extras_frame,
+            command=lambda: self.set_action(7 + self.num_players)
+        ).pack()
+        for player in range(self.num_players - 1):
+            tk.Button(
+                text="Protest", width=12, height=1, master=extras_frame,
+                command=lambda: self.set_action(8 + player)
+            ).pack()
+        extras_frame.grid(row=0, column=3, padx=25)
+
         layout.pack()
 
     def set_motion(self, idx):
@@ -112,6 +125,7 @@ class MatchGUI:
             self.print(f'"{current_player.id}" plays {move}')
             self.board.do_move(move)
             self.players.rotate(-1)
+            print(self.board.get_state())
             self.draw()
 
     def print(self, message):
@@ -125,10 +139,10 @@ class MatchGUI:
                     label = "1"
                 elif tree2[y, x] == 1:
                     label = "2"
+                elif protesters[y, x] == 1:
+                    label = "3 :O"
                 elif tree3[y, x] == 1:
                     label = "3"
-                elif protesters[y, x] == 1:
-                    label = ":O"
                 else:
                     label = ""
                 self.grid[y][x]['text'] = label
