@@ -95,6 +95,16 @@ class Board:
     def get_state(self):
         return np.vstack([self.board] + list(self.player_layers))
 
+    def copy(self):
+        board = Board(self.num_players)
+        board.board = np.copy(self.board)
+        board.legal_moves = np.copy(self.legal_moves)
+        board.player_positions = deque(np.copy(pos) for pos in self.player_positions)
+        board.unoccupied = np.copy(self.unoccupied)
+        board.num_unprotested_trees = self.num_unprotested_trees
+        board.player_layers = deque(np.copy(layers) for layers in self.player_layers)
+        return board
+
     def _update_legal_moves(self):
         # Temporarily make the current spot empty
         unoccupied = self.unoccupied
@@ -171,7 +181,7 @@ class Board:
             self._chop(action)
         elif action < 8:
             self._plant(action - 4)
-        else:
+        elif action != self.num_actions-1:
             self._protest(action - 8)
 
         # Check for winner
@@ -250,6 +260,24 @@ class Board:
         # Place protester and decrement protester count
         self.player_layers[0][2] -= 1
         protesters[min_y, min_x] = 1
+        self.num_unprotested_trees -= 1
+
+
+def stringify_move(move, num_players):
+    num_actions = num_players + 8
+    motions = {
+        0: "Up2", 1: "UpLeft", 2: "Up", 3: "UpRight", 4: "Left2", 5: "Left", 6: "Stay",
+        7: "Right", 8: "Right2", 9: "DownLeft", 10: "Down", 11: "DownRight", 12: "Down2"
+    }
+    actions = {
+        0: "ChopUp", 1: "ChopLeft", 2: "ChopRight", 3: "ChopDown",
+        4: "PlantUp", 5: "PlantLeft", 6: "PlantRight", 7: "PlantDown",
+    }
+    for i in range(num_players-1):
+        actions[8 + i] = f"Protest{i}"
+    actions[8 + num_players - 1] = "No Action"
+
+    return motions[move // num_actions], actions[move % num_actions]
 
 
 if __name__ == '__main__':
