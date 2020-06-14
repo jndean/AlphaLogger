@@ -4,8 +4,8 @@ import tkinter.font as font
 
 import numpy as np
 
-from Game import Board
-from Player import HumanPlayer, RandomPlayer
+import Game
+import Player
 
 
 class MatchGUI:
@@ -14,7 +14,7 @@ class MatchGUI:
         self.players = deque(players)
         self.num_players = len(players)
 
-        self.board = Board(self.num_players)
+        self.board = Game.Board(self.num_players)
         self.board.reset()
         self.num_actions = self.board.num_actions
 
@@ -112,7 +112,7 @@ class MatchGUI:
     def continue_game(self):
         while not self.game_over:
             current_player = self.players[0]
-            if isinstance(current_player, HumanPlayer):
+            if isinstance(current_player, Player.Human):
                 if self.chosen_motion is None or self.chosen_action is None:
                     return
                 move = self.num_actions * self.chosen_motion + self.chosen_action
@@ -123,8 +123,14 @@ class MatchGUI:
             else:
                 move = current_player.choose_move(self.board)
 
-            self.print(f'"{current_player.id}" plays {move}')
+            message = f'"{current_player.id}" plays {Game.stringify_move(move, self.num_players)}'
+            if not self.board.legal_moves[move]:
+                message += ". That's illegal!"
+            self.print(message)
+
             final_scores = self.board.do_move(move)
+            for player in self.players:
+                player.done_move(move)
 
             if final_scores is not None:
                 self.draw()
@@ -134,7 +140,6 @@ class MatchGUI:
                 return
 
             self.players.rotate(-1)
-            print(self.board.get_state())
             self.draw()
 
     def print(self, message):
@@ -165,7 +170,7 @@ class MatchGUI:
 if __name__ == '__main__':
     match = MatchGUI(
         players=[
-            HumanPlayer('Human'),
-            RandomPlayer('Random')
+            Player.Human(id_='Human'),
+            Player.RandomMCTS(id_='RandomMCTS', simulations_per_turn=100, max_rollout=30)
         ]
     )

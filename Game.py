@@ -74,6 +74,7 @@ class Board:
 
     def reset(self, player_positions=None):
         self.board = np.full((4, 5, 5), -1)
+        self.board[0, 2, 2] = 1  # Starting sapling
         self.player_layers = deque(np.full((3, 5, 5), -1) for _ in range(self.num_players))
         self.unoccupied = np.full((5, 5), True)
         self.num_unprotested_trees = 0
@@ -166,6 +167,9 @@ class Board:
         self.legal_moves = legal_moves
 
     def do_move(self, move):
+        if not self.legal_moves[move]:
+            raise ValueError(f"Doing illegal move {stringify_move(move, self.num_players)}")
+
         # Move player
         position = self.player_positions[0]
         self.player_layers[0][0, position[0], position[1]] = -1
@@ -187,7 +191,7 @@ class Board:
         # Check for winner
         for i, layers in enumerate(self.player_layers):
             if layers[1, 0, 0] >= 10:
-                ret = np.full((self.num_players,), -1)
+                ret = np.zeros((self.num_players,))
                 ret[i] = 1
                 return ret
 
