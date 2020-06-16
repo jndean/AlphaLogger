@@ -64,7 +64,7 @@ class RandomMCTS(Player):
             results = rollout_game.do_move(move)
             if results is not None:
                 return probs, np.roll(results, turn)
-        return probs, np.full((game.num_players,), 0.5)
+        return probs, np.zeros((game.num_players,),)
 
 
 

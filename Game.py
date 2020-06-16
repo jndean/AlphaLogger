@@ -74,10 +74,13 @@ class Board:
 
     def reset(self, player_positions=None):
         self.board = np.full((4, 5, 5), -1)
-        self.board[0, 2, 2] = 1  # Starting sapling
         self.player_layers = deque(np.full((3, 5, 5), -1) for _ in range(self.num_players))
         self.unoccupied = np.full((5, 5), True)
         self.num_unprotested_trees = 0
+
+        # Starting sapling
+        self.board[0, 2, 2] = 1
+        self.unoccupied[2, 2] = False
 
         np.random.shuffle(Board.corners)
         if player_positions is None:
@@ -191,7 +194,7 @@ class Board:
         # Check for winner
         for i, layers in enumerate(self.player_layers):
             if layers[1, 0, 0] >= 10:
-                ret = np.zeros((self.num_players,))
+                ret = np.full((self.num_players,), -1)
                 ret[i] = 1
                 return ret
 

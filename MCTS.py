@@ -17,18 +17,16 @@ class Node:
 
         self.P = P
         self.V = V
-        self.N = np.ones((game.num_moves,), np.uint8)
+        self.N = np.ma.array(game.legal_moves, np.uint16)
         self.W = np.zeros((game.num_moves, game.num_players), np.float32)
-        self.sumN = 0
+        self.sumN = 1
 
     def run_simulation(self):
-        if self.sumN:
-            Q = self.W[:, 0] / self.N
-            over_N = sqrt(self.sumN) / (1 + self.N)
-            U = Q + self.c_puct * self.P * over_N
-            move = np.argmax(U)
-        else:
-            move = np.argmax(self.game.legal_moves)
+        # Division by zero is ok since N is a np.ma.array
+        Q = self.W[:, 0] / self.N
+        over_N = sqrt(self.sumN) / (1 + self.N)
+        U = Q + self.c_puct * self.P * over_N
+        move = np.ma.argmax(U)
 
         node = self.nodes.get(move)
         if node is None:
