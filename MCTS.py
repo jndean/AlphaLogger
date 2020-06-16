@@ -19,7 +19,8 @@ class Node:
         self.V = V
         self.N = np.ma.array(game.legal_moves, np.uint16)
         self.W = np.zeros((game.num_moves, game.num_players), np.float32)
-        self.sumN = 1
+        self.num_legal_moves = np.sum(game.legal_moves)
+        self.sumN = self.num_legal_moves
 
     def run_simulation(self):
         # Division by zero is ok since N is a np.ma.array
@@ -42,6 +43,9 @@ class Node:
         self.N[move] += 1
         self.sumN += 1
         return np.roll(next_v, 1)
+
+    def get_treesearch_probs(self):
+        return (self.N - self.game.legal_moves) / (self.sumN - self.num_legal_moves)
 
     def next_turn_exploratory(self):
         raise NotImplementedError()

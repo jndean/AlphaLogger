@@ -40,22 +40,23 @@ class RandomMCTS(Player):
         self.max_rollout = max_rollout
 
         self.rollout_player = Random()
+        self.eval_state = lambda x: self._eval_state(x)
         self.mcts_root = None
 
     def choose_move(self, game):
         if self.mcts_root is None:
-            root = MCTS.Node(
-                game.copy(),
-                lambda x: self.eval_state(x)
-            )
-        else:
-            root = self.mcts_root
+            self.mcts_root = MCTS.Node(game.copy(), self.eval_state)
+
         for _ in range(self.simulations_per_turn):
-            root.run_simulation()
+            self.mcts_root.run_simulation()
 
-        return root.next_turn_greedy()
+        return self.mcts_root.next_turn_greedy()
 
-    def eval_state(self, game):
+    def done_move(self, move):
+        if self.mcts_root is not None:
+            self.mcts_root = self.mcts_root.nodes.get(move)
+
+    def _eval_state(self, game):
         probs = game.legal_moves * (1 / np.sum(game.legal_moves))
         rollout_game, rollout_player = game.copy(), self.rollout_player
         for turn in range(self.max_rollout):
