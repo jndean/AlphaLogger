@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 
 import Game
 import Player
@@ -9,7 +10,7 @@ def play_matches(players, num_matches=1, max_turns=1000):
     scores = [0] * num_players
     board = Game.Board(num_players)
 
-    for _ in range(num_matches):
+    for _ in tqdm(range(num_matches)):
         board.reset()
         moves = []
         for turn in range(max_turns):
@@ -40,11 +41,13 @@ def debug_game(end_board, moves):
 
 if __name__ == '__main__':
     players = [
-        Player.RandomPlayer("Random1"),
-        Player.RandomPlayer("Random2"),
+        # Player.RandomMCTS(id_="RandomMCTS100", simulations_per_turn=100, max_rollout=30),
+        Player.RandomMCTS(id_="RandomMCTS", simulations_per_turn=100, max_rollout=30),
+        Player.Random(id_="Random", ),
+
     ]
-    num_matches = 100
-    max_turns = 100
+    num_matches = 10
+    max_turns = 50
 
     scores = play_matches(players, num_matches, max_turns)
 

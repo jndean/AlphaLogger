@@ -3,6 +3,9 @@ import numpy as np
 import MCTS
 
 
+indexes = np.arange(13 * 13)
+
+
 class Player:
     def __init__(self, id_=None):
         self.id = id_
@@ -20,16 +23,13 @@ class Human(Player):
 
 
 class Random(Player):
-    idxs = np.arange(13 * 13)
-
     def choose_move(self, game):
         probs = game.legal_moves / np.sum(game.legal_moves)
-        move = np.random.choice(self.idxs[:game.num_moves], p=probs)
+        move = np.random.choice(indexes[:game.num_moves], p=probs)
         return move
 
 
 class RandomMCTS(Player):
-    idxs = np.arange(13 * 13)
 
     def __init__(self, simulations_per_turn, max_rollout, **kwargs):
         super().__init__(**kwargs)
@@ -52,10 +52,6 @@ class RandomMCTS(Player):
 
         return root.next_turn_greedy()
 
-    def done_move(self, move):
-        if self.mcts_root is not None:
-            self.mcts_root = self.mcts_root.nodes.get(move)
-
     def eval_state(self, game):
         probs = game.legal_moves * (1 / np.sum(game.legal_moves))
         rollout_game, rollout_player = game.copy(), self.rollout_player
@@ -67,6 +63,38 @@ class RandomMCTS(Player):
         return probs, np.zeros((game.num_players,),)
 
 
+class PointsOnlyMCTS(Player):
 
+    def __init__(self, simulations_per_turn=100, **kwargs):
+        super().__init__(**kwargs)
+        self.simulations_per_turn = simulations_per_turn
+        self.mcts_root = None
 
+    def choose_move(self, game):
+        if self.mcts_root is None:
+            root = MCTS.Node(
+                game.copy(),
+                lambda x: self.eval_state(x)
+            )
+        else:
+            root = self.mcts_root
+        for _ in range(self.simulations_per_turn):
+            root.run_simulation()
+
+        print(root.N.reshape((13, -1)))
+        print((root.W[:, 0]/ root.N).reshape((13, -1)))
+        return root.next_turn_greedy()
+
+    def done_move(self, move):
+        if self.mcts_root is not None:
+            self.mcts_root = self.mcts_root.nodes.get(move)
+
+    def eval_state(self, game):
+        probs = game.legal_moves / np.sum(game.legal_moves)
+        points = np.array([p[1, 0, 0] for p in game.player_layers])
+        delta = points - np.min(points)
+        delta = delta / (2 * np.max(delta) + 0.00001)
+        points = points / 5 - 1
+        scores = points + delta
+        return probs, scores
 

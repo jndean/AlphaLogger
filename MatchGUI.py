@@ -170,7 +170,7 @@ class MatchGUI:
 if __name__ == '__main__':
     match = MatchGUI(
         players=[
+            Player.PointsOnlyMCTS(id_='PointsMCTS', simulations_per_turn=400),
             Player.Human(id_='Human'),
-            Player.RandomMCTS(id_='RandomMCTS', simulations_per_turn=100, max_rollout=30)
         ]
     )
