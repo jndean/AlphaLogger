@@ -16,6 +16,9 @@ class Player:
     def done_move(self, move):
         pass
 
+    def reset(self):
+        pass
+
 
 class Human(Player):
     def choose_move(self):
@@ -62,6 +65,9 @@ class RandomMCTS(Player):
                 return probs, np.roll(results, turn)
         return probs, np.zeros((game.num_players,),)
 
+    def reset(self):
+        self.mcts_root = None
+
 
 class PointsOnlyMCTS(Player):
 
@@ -69,27 +75,22 @@ class PointsOnlyMCTS(Player):
         super().__init__(**kwargs)
         self.simulations_per_turn = simulations_per_turn
         self.mcts_root = None
+        self.eval_state = lambda x: self._eval_state(x)
 
     def choose_move(self, game):
         if self.mcts_root is None:
-            root = MCTS.Node(
-                game.copy(),
-                lambda x: self.eval_state(x)
-            )
-        else:
-            root = self.mcts_root
-        for _ in range(self.simulations_per_turn):
-            root.run_simulation()
+            self.mcts_root = MCTS.Node(game.copy(), self.eval_state)
 
-        print(root.N.reshape((13, -1)))
-        print((root.W[:, 0]/ root.N).reshape((13, -1)))
-        return root.next_turn_greedy()
+        for _ in range(self.simulations_per_turn):
+            self.mcts_root.run_simulation()
+
+        return self.mcts_root.next_turn_greedy()
 
     def done_move(self, move):
         if self.mcts_root is not None:
             self.mcts_root = self.mcts_root.nodes.get(move)
 
-    def eval_state(self, game):
+    def _eval_state(self, game):
         probs = game.legal_moves / np.sum(game.legal_moves)
         points = np.array([p[1, 0, 0] for p in game.player_layers])
         delta = points - np.min(points)
@@ -98,3 +99,5 @@ class PointsOnlyMCTS(Player):
         scores = points + delta
         return probs, scores
 
+    def reset(self):
+        self.mcts_root = None
