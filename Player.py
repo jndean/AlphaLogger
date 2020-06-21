@@ -1,6 +1,6 @@
 import numpy as np
 
-import MCTS
+from MCTS import MCTS
 
 
 indexes = np.arange(13 * 13)
@@ -34,27 +34,25 @@ class Random(Player):
 
 class RandomMCTS(Player):
 
-    def __init__(self, simulations_per_turn, max_rollout, **kwargs):
+    def __init__(self, simulations_per_turn, max_rollout, learning=False, **kwargs):
         super().__init__(**kwargs)
-        self.simulations_per_turn = simulations_per_turn
         self.max_rollout = max_rollout
 
         self.rollout_player = Random()
-        self.eval_state = lambda x: self._eval_state(x)
-        self.mcts_root = None
+        self.MCTS = MCTS(
+            eval_method=lambda x: self._eval_state(x),
+            simulations_per_turn=simulations_per_turn,
+            learning=learning
+        )
 
     def choose_move(self, game):
-        if self.mcts_root is None:
-            self.mcts_root = MCTS.Node(game.copy(), self.eval_state)
-
-        for _ in range(self.simulations_per_turn):
-            self.mcts_root.run_simulation()
-
-        return self.mcts_root.next_turn_greedy()
+        return self.MCTS.choose_move(game)
 
     def done_move(self, move):
-        if self.mcts_root is not None:
-            self.mcts_root = self.mcts_root.nodes.get(move)
+        self.MCTS.done_move(move)
+
+    def reset(self):
+        self.MCTS.reset()
 
     def _eval_state(self, game):
         probs = game.legal_moves * (1 / np.sum(game.legal_moves))
@@ -66,30 +64,25 @@ class RandomMCTS(Player):
                 return probs, np.roll(results, turn)
         return probs, np.zeros((game.num_players,),)
 
-    def reset(self):
-        self.mcts_root = None
-
 
 class PointsOnlyMCTS(Player):
 
-    def __init__(self, simulations_per_turn=100, **kwargs):
+    def __init__(self, simulations_per_turn=100, learning=False, **kwargs):
         super().__init__(**kwargs)
-        self.simulations_per_turn = simulations_per_turn
-        self.mcts_root = None
-        self.eval_state = lambda x: self._eval_state(x)
+        self.MCTS = MCTS(
+            eval_method=lambda x: self._eval_state(x),
+            simulations_per_turn=simulations_per_turn,
+            learning=learning
+        )
 
     def choose_move(self, game):
-        if self.mcts_root is None:
-            self.mcts_root = MCTS.Node(game.copy(), self.eval_state)
-
-        for _ in range(self.simulations_per_turn):
-            self.mcts_root.run_simulation()
-
-        return self.mcts_root.next_turn_greedy()
+        return self.MCTS.choose_move(game)
 
     def done_move(self, move):
-        if self.mcts_root is not None:
-            self.mcts_root = self.mcts_root.nodes.get(move)
+        self.MCTS.done_move(move)
+
+    def reset(self):
+        self.MCTS.reset()
 
     def _eval_state(self, game):
         probs = game.legal_moves / np.sum(game.legal_moves)
@@ -100,5 +93,3 @@ class PointsOnlyMCTS(Player):
         scores = points + delta
         return probs, scores
 
-    def reset(self):
-        self.mcts_root = None

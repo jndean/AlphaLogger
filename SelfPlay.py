@@ -20,7 +20,7 @@ def self_play_matches(player, num_players=2, num_samples=100, max_turns=100):
         move = player.choose_move(board)
 
         states[i] = board.get_state()
-        probs[i] = player.mcts_root.get_treesearch_probs()
+        probs[i] = player.MCTS.root_node.mcts_probs
 
         result = board.do_move(move)
         player.done_move(move)
@@ -42,5 +42,5 @@ def self_play_matches(player, num_players=2, num_samples=100, max_turns=100):
 
 if __name__ == "__main__":
 
-    player = Player.RandomMCTS(id_="Player", simulations_per_turn=50, max_rollout=30)
+    player = Player.RandomMCTS(id_="Player", simulations_per_turn=50, max_rollout=30, learning=True)
     states, probs, scores = self_play_matches(player, 3, num_samples=100)
