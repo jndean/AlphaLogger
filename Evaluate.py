@@ -34,7 +34,7 @@ def debug_game(end_board, moves):
     board = Game.Board(n)
     board.reset(player_positions=np.copy(Game.Board.corners[:n]))
     for move in moves:
-        print(board.get_state()[1:4])
+        print(board.get_state()[..., 1:4])
         print(Game.stringify_move(move, n))
         board.do_move(move)
 

@@ -73,13 +73,13 @@ class Board:
         self.num_unprotested_trees, self.player_layers = None, None
 
     def reset(self, player_positions=None):
-        self.board = np.full((4, 5, 5), -1)
-        self.player_layers = deque(np.full((3, 5, 5), -1) for _ in range(self.num_players))
+        self.board = np.full((5, 5, 4), -1)
+        self.player_layers = deque(np.full((5, 5, 3), -1) for _ in range(self.num_players))
         self.unoccupied = np.full((5, 5), True)
         self.num_unprotested_trees = 0
 
         # Starting sapling
-        self.board[0, 2, 2] = 1
+        self.board[2, 2, 0] = 1
         self.unoccupied[2, 2] = False
 
         np.random.shuffle(Board.corners)
@@ -89,15 +89,15 @@ class Board:
             self.player_positions = deque(player_positions[:])
 
         for (y, x), planes in zip(self.player_positions, self.player_layers):
-            planes[0, y, x] = 1  # Player position
-            planes[1] = 0  # Player score
-            planes[2] = 1  # Player protesters
+            planes[y, x, 0] = 1  # Player position
+            planes[..., 1] = 0  # Player score
+            planes[..., 2] = 1  # Player protesters
             self.unoccupied[y, x] = False
 
         self._update_legal_moves()
 
     def get_state(self):
-        return np.vstack([self.board] + list(self.player_layers))
+        return np.concatenate([self.board] + list(self.player_layers), axis=-1)
 
     def copy(self):
         board = Board(self.num_players)
@@ -132,7 +132,9 @@ class Board:
         # Then compute the legal actions following legal motions
         legal_moves = np.full((self.num_moves,), False)
         block_idxs = range(0, self.num_moves, self.num_actions)
-        tree2_layer, tree3_layer, protester_layer = self.board[1:4]
+        tree2_layer = self.board[..., 1]
+        tree3_layer = self.board[..., 2]
+        protester_layer = self.board[..., 3]
         for block_start, player_pos, legal_motion in zip(block_idxs, new_positions, legal_motions):
             if not legal_motion:
                 continue
@@ -157,7 +159,7 @@ class Board:
                 )
 
             # Can play protester if you have one and there's a suitable tree
-            if self.player_layers[0][2][0][0] > 0 and (
+            if self.player_layers[0][0, 0, 2] > 0 and (
                     self.num_unprotested_trees > 0 or
                     np.sum(tree2_layer[player_pos[0], :]) != -5 or
                     np.sum(tree2_layer[:, player_pos[1]]) != -5
@@ -175,10 +177,10 @@ class Board:
 
         # Move player
         position = self.player_positions[0]
-        self.player_layers[0][0, position[0], position[1]] = -1
+        self.player_layers[0][position[0], position[1], 0] = -1
         self.unoccupied[position[0], position[1]] = True
         position += Board.motions[move // self.num_actions]
-        self.player_layers[0][0, position[0], position[1]] = 1
+        self.player_layers[0][position[0], position[1], 0] = 1
         self.unoccupied[position[0], position[1]] = False
         self._grow()
 
@@ -193,7 +195,7 @@ class Board:
 
         # Check for winner
         for i, layers in enumerate(self.player_layers):
-            if layers[1, 0, 0] >= 10:
+            if layers[0, 0, 1] >= 10:
                 ret = np.full((self.num_players,), -1)
                 ret[i] = 1
                 return ret
@@ -206,21 +208,21 @@ class Board:
         return None
 
     def _grow(self):
-        next_trees = np.copy(self.board[:3])
+        next_trees = np.copy(self.board[..., :3])
 
         def grow_square(y, x):
-            if self.board[0, y, x] == 1:  # Grow sapling
-                next_trees[0, y, x] = -1
-                next_trees[1, y, x] = 1
-            elif self.board[1, y, x] == 1:  # Grow mid-tree
-                next_trees[1, y, x] = -1
-                next_trees[2, y, x] = 1
+            if self.board[y, x, 0] == 1:  # Grow sapling
+                next_trees[y, x, 0] = -1
+                next_trees[y, x, 1] = 1
+            elif self.board[y, x, 1] == 1:  # Grow mid-tree
+                next_trees[y, x, 1] = -1
+                next_trees[y, x, 2] = 1
                 self.num_unprotested_trees += 1
-            elif self.board[2, y, x] == 1:  # Mature tree spreads saplings
+            elif self.board[y, x, 2] == 1:  # Mature tree spreads saplings
                 for dir_y, dir_x in self.directions:
                     sq_y, sq_x = y + dir_y, x + dir_x
                     if _within_bounds((sq_y, sq_x)) and self.unoccupied[sq_y, sq_x]:
-                        next_trees[0, sq_y, sq_x] = 1
+                        next_trees[sq_y, sq_x, 0] = 1
                         self.unoccupied[sq_y, sq_x] = False
 
         player_y, player_x = self.player_positions[0]
@@ -229,30 +231,30 @@ class Board:
         for _x in range(0, 5):
             grow_square(player_y, _x)
 
-        self.board[:3] = next_trees
+        self.board[..., :3] = next_trees
 
     def _plant(self, dir_num):
         y, x = self.player_positions[0] + Board.directions[dir_num]
-        self.board[0, y, x] = 1
+        self.board[y, x, 0] = 1
         self.unoccupied[y, x] = False
 
     def _chop(self, dir_num):
         direction = Board.directions[dir_num]
         square = self.player_positions[0] + direction
-        while _within_bounds(square) and self.board[2, square[0], square[1]] == 1:
-            self.board[2, square[0], square[1]] = -1
+        while _within_bounds(square) and self.board[square[0], square[1], 2] == 1:
+            self.board[square[0], square[1], 2] = -1
             self.unoccupied[square[0], square[1]] = True
-            self.player_layers[0][1] += 1
-            if self.board[3, square[0], square[1]] == 1:  # Collect protester
-                self.board[3, square[0], square[1]] = -1
-                self.player_layers[0][2] += 1
+            self.player_layers[0][..., 1] += 1
+            if self.board[square[0], square[1], 3] == 1:  # Collect protester
+                self.board[square[0], square[1], 3] = -1
+                self.player_layers[0][..., 2] += 1
             else:
                 self.num_unprotested_trees -= 1
             square += direction
 
     def _protest(self, opponent_index):
         # Find closest tree to targeted opponent
-        trees, protesters = self.board[2:4]
+        trees, protesters = self.board[..., 2], self.board[..., 3]
         opponent_y, opponent_x = self.player_positions[1 + opponent_index]
         min_dist, min_y, min_x = 999, None, None
         for y in range(5):
@@ -265,7 +267,7 @@ class Board:
                     min_dist, min_y, min_x = dist, y, x
 
         # Place protester and decrement protester count
-        self.player_layers[0][2] -= 1
+        self.player_layers[0][..., 2] -= 1
         protesters[min_y, min_x] = 1
         self.num_unprotested_trees -= 1
 
@@ -286,24 +288,3 @@ def stringify_move(move, num_players):
 
     return motions[move // num_actions], actions[move % num_actions]
 
-
-if __name__ == '__main__':
-
-    game = Board(2)
-    game.reset()
-
-    game.board[2, 3, 3] = 1
-    game.unoccupied[3, 3] = False
-    game.num_unprotested_trees = 1
-
-    game._update_legal_moves()
-
-    print(game.get_state())
-    print(game.get_legal_moves().reshape((13, -1)))
-
-    quit()
-    print(game.player_positions[0])
-    print(Board.corners)
-    game.player_positions[0] += np.array([1, 1])
-    print(game.player_positions[0])
-    print(Board.corners)

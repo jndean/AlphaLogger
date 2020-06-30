@@ -56,45 +56,43 @@ def create_model(
 ):
 
     L2 = tf.keras.regularizers.l2(l=l2_regularisation)
-    dense_params = {"kernel_regularizer": L2, "bias_regularizer": L2}
-    conv_params = {"kernel_regularizer": L2, "bias_regularizer": L2,
-                   "data_format": "channels_first"}
+    regularisers = {"kernel_regularizer": L2, "bias_regularizer": L2}
 
     input_ = Input(shape=input_shape)
 
     # The feature extractor body
-    feature_output = Conv2D(conv_filters, 3, padding='same', **conv_params)(input_)
+    feature_output = Conv2D(conv_filters, 3, padding='same', **regularisers)(input_)
     feature_output = BatchNormalization()(feature_output)
     feature_output = ReLU()(feature_output)
     skip_connection = feature_output
     for _ in range(num_resnet_blocks):
-        feature_output = Conv2D(conv_filters, 3, padding='same', **conv_params)(feature_output)
+        feature_output = Conv2D(conv_filters, 3, padding='same', **regularisers)(feature_output)
         feature_output = BatchNormalization()(feature_output)
         feature_output = ReLU()(feature_output)
-        feature_output = Conv2D(conv_filters, 3, padding='same', **conv_params)(feature_output)
+        feature_output = Conv2D(conv_filters, 3, padding='same', **regularisers)(feature_output)
         feature_output = BatchNormalization()(feature_output)
         feature_output = feature_output + skip_connection
         feature_output = ReLU()(feature_output)
         skip_connection = feature_output
 
     # The Value head
-    value_output = Conv2D(1, 1, padding='same', **conv_params)(feature_output)
+    value_output = Conv2D(1, 1, padding='same', **regularisers)(feature_output)
     value_output = BatchNormalization()(value_output)
     value_output = ReLU()(value_output)
     value_output = Flatten()(value_output)
-    value_output = Dense(value_dense_neurons, **dense_params)(value_output)
+    value_output = Dense(value_dense_neurons, **regularisers)(value_output)
     value_output = ReLU()(value_output)
-    value_output = Dense(num_players, activation='softmax', **dense_params)(value_output)
+    value_output = Dense(num_players, activation='softmax', **regularisers)(value_output)
     value_output = 2. * value_output - 1  # Transform from [0, 1] to [-1, 1]
     value_output = Lambda(lambda x: x, name="value_output")(value_output)
 
     # The Policy head
-    policy_output = Conv2D(2, 1, padding='same', **conv_params)(feature_output)
+    policy_output = Conv2D(2, 1, padding='same', **regularisers)(feature_output)
     policy_output = BatchNormalization()(policy_output)
     policy_output = ReLU()(policy_output)
     policy_output = Flatten()(policy_output)
     policy_output = Dense(
-        num_moves, activation='softmax', name='policy_output', **dense_params)(policy_output)
+        num_moves, activation='softmax', name='policy_output', **regularisers)(policy_output)
 
     model = Model(inputs=input_, outputs=[value_output, policy_output])
     optimiser = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=lr_momentum)

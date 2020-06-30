@@ -119,6 +119,7 @@ class MatchGUI:
                 self.chosen_motion, self.chosen_action = None, None
                 if not self.board.legal_moves[move]:
                     self.print(f"Illegal move ({move})")
+                    print(self.board.legal_moves.reshape((13, -1)))
                     return
             else:
                 move = current_player.choose_move(self.board)
@@ -146,16 +147,15 @@ class MatchGUI:
         self.message_box['text'] = message
 
     def draw(self):
-        tree1, tree2, tree3, protesters = self.board.board
         for y in range(5):
             for x in range(5):
-                if tree1[y, x] == 1:
+                if self.board.board[y, x, 0] == 1:
                     label = "1"
-                elif tree2[y, x] == 1:
+                elif self.board.board[y, x, 1] == 1:
                     label = "2"
-                elif protesters[y, x] == 1:
+                elif self.board.board[y, x, 3] == 1:
                     label = "3 :O"
-                elif tree3[y, x] == 1:
+                elif self.board.board[y, x, 2] == 1:
                     label = "3"
                 else:
                     label = ""
@@ -163,14 +163,14 @@ class MatchGUI:
         for player, (y, x), layers in zip(
                 self.players, self.board.player_positions, self.board.player_layers
         ):
-            score, protesters = layers[1:, 0, 0]
+            score, protesters = layers[0, 0, 1], layers[0, 0, 2]
             self.grid[y][x]['text'] = f"{player.id}\n{score} ({protesters})"
 
 
 if __name__ == '__main__':
     match = MatchGUI(
         players=[
-            Player.PointsOnlyMCTS(id_='PointsMCTS', simulations_per_turn=400),
+            Player.PointsOnlyMCTS(id_='PointsMCTS', simulations_per_turn=100),
             Player.Human(id_='Human'),
         ]
     )
