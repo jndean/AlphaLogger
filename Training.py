@@ -1,3 +1,4 @@
+from random import randrange as rng
 
 import numpy as np
 import tensorflow as tf
@@ -103,6 +104,83 @@ def create_model(
     return model
 
 
+"""
+Since playing games is more expensive than training, we exploit the symmetries of
+the board and rules to augment data from played games.
+The reflection symmetries are enumerated 
+       0     1
+   \   |   /
+     \ | / 
+  -----|------ 2
+     / | \
+   /   |   \
+             3
+rotations are enumerated by multiples of 90 degrees clockwise
+"""
+
+
+movement_permutations = [
+    [0, 3, 2, 1, 8, 7, 6, 5, 4, 11, 10, 9, 12],  # Reflection 0
+    [8, 11, 7, 3, 12, 10, 6, 2, 0, 9, 5, 1, 4],  # Reflection 1
+    [12, 9, 10, 11, 4, 5, 6, 7, 8, 1, 2, 3, 0],  # Reflection 2
+    [4, 1, 5, 9, 0, 2, 6, 10, 12, 3, 7, 11, 8],  # Reflection 3
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],  # Rotation 0 (identity)
+    [4, 9, 5, 1, 12, 10, 6, 2, 0, 11, 7, 3, 8],  # Rotation 1
+    [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],  # Rotation 2
+    [8, 3, 7, 11, 0, 2, 6, 10, 12, 1, 5, 9, 4],  # Rotation 3
+]
+
+action_permutations = [
+    [0, 2, 1, 3, 4, 6, 5, 7],  # Reflection 0
+    [2, 3, 0, 1, 6, 7, 4, 5],  # Reflection 1
+    [3, 1, 2, 0, 7, 5, 6, 4],  # Reflection 2
+    [1, 0, 3, 2, 5, 4, 7, 6],  # Reflection 3
+    [0, 1, 2, 3, 4, 5, 6, 7],  # Rotation 0 (identity)
+    [1, 3, 0, 2, 5, 7, 4, 6],  # Rotation 1
+    [3, 2, 1, 0, 7, 6, 5, 4],  # Rotation 2
+    [2, 0, 3, 1, 6, 4, 7, 5],  # Rotation 3
+]
+
+state_transforms = [
+    lambda x: np.flip(x, axis=1),
+    lambda x: np.transpose(x[::-1,::-1, :], axes=(1, 0, 2)),
+    lambda x: np.flip(x, axis=0),
+    lambda x:  np.transpose(x, axes=(1, 0, 2)),
+    lambda x: x,
+    lambda x: np.rot90(x),
+    lambda x: np.rot90(x, k=2),
+    lambda x: np.rot90(x, k=3),
+]
+
+
+def transform_move(move, transform_idx, num_moves):
+    x = np.zeros((num_moves,))
+    x[move] = 1
+    row_perm = movement_permutations[transform_idx]
+    col_perm = action_permutations[transform_idx]
+    x = x.reshape((13, -1))[row_perm][:, col_perm].flatten()
+    return np.argmax(x)
+
+
+def transform_tuple(state, probs, transform_idx):
+    row_perm = movement_permutations[transform_idx]
+    col_perm = action_permutations[transform_idx]
+    out_probs = probs[row_perm][:, col_perm]
+    out_state = state_transforms[transform_idx](state)
+    return out_state, out_probs
+
+
+def augment_and_sample(data, num_samples):
+    data = data[np.random.choice(data.shape[0], num_samples, replace=False), ...]
+    data = data.reshape((data.shape[0], 13, -1))
+    for i in range(data.shape[0]):
+        p_i = rng(8)
+        row_perm = movement_permutations[p_i]
+        col_perm = action_permutations[p_i]
+        data[i] = data[i][row_perm][:, col_perm]
+    return data
+
+
 if __name__ == "__main__":
 
     num_players = 2
@@ -123,9 +201,7 @@ if __name__ == "__main__":
 
     print("Self-play")
     player = Player.RandomMCTS(id_="Player", simulations_per_turn=50, max_rollout=30, learning=True)
-    states, probs, scores = self_play_matches(player, 2, num_samples=40)
+    states, probs, scores = self_play_matches(player, 2, num_samples=100)
 
     print('Training')
-    model.fit(
-        states, [scores, probs]
-    )
+    model.fit(states, [scores, probs])
