@@ -81,11 +81,11 @@ class Node:
         self.nodes = {}
 
         P, V = eval_method(game)
-        P *= game.legal_moves
+        P = P.flatten() * game.legal_moves
         P *= 1 / np.sum(P)
 
         self.P = P
-        self.V = V
+        self.V = V.flatten()
         self.N = np.ma.array(game.legal_moves, np.uint16)
         self.W = np.zeros((game.num_moves, game.num_players), np.float32)
         self.num_legal_moves = np.sum(game.legal_moves)

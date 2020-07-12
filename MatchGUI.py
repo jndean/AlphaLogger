@@ -5,6 +5,7 @@ import tkinter.font as font
 import numpy as np
 
 import Game
+from Model import create_model
 import Player
 
 
@@ -168,9 +169,27 @@ class MatchGUI:
 
 
 if __name__ == '__main__':
+
+    num_players = 2
+    g = Game.Board(num_players)
+    g.reset()
+    model = create_model(
+        input_shape=g.get_state().shape,
+        num_moves=g.num_moves,
+        num_players=num_players
+    )
+
+    AL = Player.AlphaLogger(
+        id_='AlphaLogger',
+        model=model,
+        simulations_per_turn=50,
+        learning=False
+    )
+
     match = MatchGUI(
         players=[
-            Player.PointsOnlyMCTS(id_='PointsMCTS', simulations_per_turn=100),
+            # Player.PointsOnlyMCTS(id_='PointsMCTS', simulations_per_turn=100),
+            AL,
             Player.Human(id_='Human'),
         ]
     )

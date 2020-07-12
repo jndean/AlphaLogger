@@ -93,3 +93,26 @@ class PointsOnlyMCTS(Player):
         scores = points + delta
         return probs, scores
 
+
+class AlphaLogger(Player):
+
+    def __init__(self, model=None, simulations_per_turn=100, learning=False, **kwargs):
+        super().__init__(**kwargs)
+        self.model = model
+        self.MCTS = MCTS(
+            lambda x: self._eval_state(x),
+            simulations_per_turn=simulations_per_turn,
+            learning=learning
+        )
+
+    def choose_move(self, game):
+        return self.MCTS.choose_move(game)
+
+    def done_move(self, move):
+        self.MCTS.done_move(move)
+
+    def reset(self):
+        self.MCTS.reset()
+
+    def _eval_state(self, game):
+        return self.model.predict(game.get_state()[None, ...])
