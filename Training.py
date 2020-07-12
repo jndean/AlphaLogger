@@ -3,6 +3,7 @@ from random import randrange as rng
 import numpy as np
 from tqdm import tqdm
 
+from Evaluate import play_matches
 import Game
 from Model import create_model
 import Player
@@ -144,7 +145,6 @@ if __name__ == "__main__":
     game = Game.Board(num_players)
     game.reset()
 
-    print('Building model')
     model = create_model(
         input_shape=game.get_state().shape,
         num_moves=game.num_moves,
@@ -156,9 +156,21 @@ if __name__ == "__main__":
         l2_regularisation=0.0001
     )
 
-    print("Self-play")
-    player = Player.RandomMCTS(id_="Player", simulations_per_turn=50, max_rollout=30, learning=True)
-    states, probs, scores = self_play_matches(player, 2, num_samples=100)
+    training_player = Player.AlphaLogger(
+        id_="AL_training", model=model, simulations_per_turn=50, learning=True
+    )
+    evaluation_player = Player.AlphaLogger(
+        id_="AL_evaluation", model=model, simulations_per_turn=50, learning=False
+    )
+    random_opponent = Player.RandomMCTS(id_="Random", simulations_per_turn=50, max_rollout=30)
 
-    print('Training')
-    model.fit(states, [probs, scores])
+    while 1:
+        for _ in range(5):
+            states, probs, scores = self_play_matches(training_player, num_players, num_samples=200)
+            model.fit(states, [probs, scores], epochs=2)
+
+        scores = play_matches([evaluation_player, random_opponent], num_matches=20, max_turns=50)
+        print(f'Win rate: {scores[0]}/8')
+
+
+
