@@ -43,13 +43,17 @@ typedef struct {
 
 
 typedef struct {
-	int8_t* unoccupied;
-	int8_t* legal_moves;
-	int8_t* board;
-	int stride;
-    Position player_positions[4];
+    Position positions[4];
+    int8_t scores[4];
+    int8_t protesters[4];
+
+	int8_t board[5 * 5 * 4];
+	int8_t unoccupied[5 * 5];
+	int8_t legal_moves[5 * 5 * 10];
+
     uint8_t num_players;
     uint8_t num_unprotested_trees;
+    uint8_t current_player;
 
 } LoggerState;
 
@@ -57,81 +61,98 @@ typedef struct {
 /* 
   Initialise the memory for a LoggerState struct.
   Doesn't set the memory to a valid game state.
-*/
+
 int LoggerState_init(LoggerState* state, uint8_t num_players) {
 
     state->num_players = num_players;
-    state->stride = 4 + 3 * num_players;
     state->unoccupied = malloc(25 * (1 + 10 + 4 + 3 * num_players));
     if (state->unoccupied == NULL)
     	return 0;
-    state->legal_moves = state->unoccupied + 25;
-    state->board = state->unoccupied + 25 * 11;
-
     return 1;
 }
 
-
-/* 
   Uninitialise the memory in a LoggerState struct. 
   Doesn't free the LoggerState struct.
-*/
+
 void LoggerState_uninit(LoggerState* state) {
 	if (state->unoccupied != NULL) 
 		free(state->unoccupied);
 }
-
+*/
 
 /* 
   Set the game state to a new game with random player positions
 */
-void LoggerState_reset(LoggerState* state) {
+void LoggerState_reset(LoggerState* state, uint8_t num_players) {
 
-	memset(state->unoccupied, 1, 25);
-	memset(state->board, -1, 25 * (4 + 3 * state->num_players));
-	for (int xy = 0; xy < 25; ++xy) {
-		int8_t *pos = state->board + state->stride * xy + PLAYERS + 1;
-		for (int p = 0; p < state->num_players; ++p, pos += 3) {
-			*pos = 0;
-			*(pos + 1) = 1;
-		}
-	}
+	// Fill with empty markers
+	memset(state->scores,      0, sizeof(state->scores));
+	memset(state->protesters,  1, sizeof(state->protesters));
+	memset(state->board,      -1, sizeof(state->board));
+	memset(state->unoccupied,  1, sizeof(state->unoccupied));
 
+	state->num_players = num_players;
+	state->num_unprotested_trees = 0;
+	state->current_player = 0;
+
+	// Place players
 	int corner;
-	char corners[4] = {0, 0, 0, 0};
-	for (int p = 0; p < state->num_players; ++p) {
-		do {corner = rand() & 3;} while(corners[corner]);
-		corners[corner] = 1;
+	int8_t taken_corners[4] = {0, 0, 0, 0};
+	for (int p = 0; p < num_players; ++p) {
+		do {corner = rand() & 3;} while(taken_corners[corner]);
+		taken_corners[corner] = 1;
 		int8_t x = (corner & 1) << 2;
 		int8_t y = (corner & 2) << 1;
-		state->player_positions[p].x = x;
-		state->player_positions[p].y = y;
-		state->board[(5 * y + x) * state->stride + PLAYERS + 3 * p] = 1;
+		state->positions[p].x = x;
+		state->positions[p].y = y;
+		state->unoccupied[5 * y + x] = 0;
 	}
+
+	// Place centre sapling
+	size_t pos = (2 * 5 + 2) * 4 + 0;  // Y=2, X=2, C=0
+	state->board[pos] = 1;
+	state->unoccupied[pos] = 0;
 }
 
+
+int on_board(Position pos) {
+	return (pos.x >=0) && (pos.x < 5) && (pos.y >= 0) && (pos.y < 5);
+}
+
+
+/* 
+  Compute the next game state after the given move, and put it in the output
+  state object.
+*/
+void LoggerState_domove(LoggerState* in, LoggerState* out, int move) {
+	Position pos = {.y = move / 50, .x = (move % 50) / 10};
+	int action = move % 10;
+
+	// Move player
+
+
+}
 
 // ---------------------------- PyLoggerState wrapper ---------------------------- //
 
 typedef struct {
     PyObject_HEAD
-    LoggerState content;
+    LoggerState* state;
 } PyLoggerState;
 
 static PyObject *
 PyLoggerState_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 
-  	PyObject *num_players_obj = NULL;
-  	if(!PyArg_ParseTuple(args, "O", &num_players_obj))
-    	return NULL;
-    long num_players = PyLong_AsLong(num_players_obj);
-
-
     PyLoggerState *self;
     self = (PyLoggerState *) type->tp_alloc(type, 0);
-    if (self == NULL || LoggerState_init(&self->content, num_players) == 0)
-        return NULL;
+    if (self == NULL) return NULL;
+
+    self->state = malloc(sizeof(LoggerState));
+    if (self->state == NULL) {
+    	Py_DECREF(self);
+    	return NULL;
+    }
 
     return (PyObject *) self;
 }
@@ -139,31 +160,56 @@ PyLoggerState_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static void
 PyLoggerState_dealloc(PyLoggerState *self)
 {
-    LoggerState_uninit(&self->content);
     Py_TYPE(self)->tp_free((PyObject *) self);
 }
 
 static int
 PyLoggerState_init(PyLoggerState *self, PyObject *args, PyObject *kwds)
 {
-	LoggerState_reset(&self->content);
+	PyObject *num_players = NULL;
+  	if(!PyArg_ParseTuple(args, "O", &num_players))
+    	return -1;
+
+	LoggerState_reset(self->state, PyLong_AsLong(num_players));
     return 0;
 }
 
 static PyObject*
-PyLoggerState_toarray(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
+PyLoggerState_getarray(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
 {
-	npy_intp dims[] = {5, 5, self->content.stride};
-	PyObject *arr = PyArray_SimpleNewFromData(
-		3, dims, NPY_INT8, self->content.board
-	);
+	LoggerState* state = self->state;
 
-	return arr;
+	const int num_channels = 4 + 3 * state->num_players;
+	npy_intp dims[] = {5, 5, num_channels};
+	PyObject *out_arr = PyArray_SimpleNew(3, dims, NPY_INT8);
+
+	int8_t* out_data = PyArray_GETPTR1((PyArrayObject*) out_arr, 0);
+	for(int xy = 0; xy < 25; ++xy) {
+		int8_t* in = state->board + xy * 4;
+		int8_t* out = out_data + xy * num_channels;
+		*(out++) = *(in++);
+		*(out++) = *(in++);
+		*(out++) = *(in++);
+		*(out++) = *(in);
+		for (int p = 0; p < state->num_players; ++p) {
+			int p_actual = (p + state->current_player) % state->num_players;
+			*(out++) = -1;
+			*(out++) = state->scores[p_actual];
+			*(out++) = state->protesters[p_actual];
+		}
+	}
+
+	for (int p = 0; p < state->num_players; ++p) {
+		Position pos = state->positions[(p + state->current_player) % state->num_players];
+		out_data[(5 * pos.y + pos.x) * num_channels + 4] = 1;
+	}
+
+	return out_arr;
 }
 
 
 static PyMethodDef PyLoggerState_methods[] = {
-    {"toarray", (PyCFunction) PyLoggerState_toarray, METH_NOARGS,
+    {"get_array", (PyCFunction) PyLoggerState_getarray, METH_NOARGS,
      "Get the board state as a numpy array"},
     {NULL}  /* Sentinel */
 };
@@ -186,17 +232,6 @@ static PyTypeObject PyLoggerStateType = {
 
 
 PyObject* logger_testmethod(PyObject* self, PyObject* args){
-
-  PyLongObject *target = NULL, *source = NULL;
-  if(!PyArg_ParseTuple(args, "OO", &target, &source))
-    return NULL;
-
-  if(!PyLong_Check(target) || !PyLong_Check(source)){
-    PyErr_SetString(PyExc_ValueError, "set_int requires two integers.");
-    return NULL;
-  }
-
-  printf("Done");
   
   Py_RETURN_NONE;
 }
