@@ -13,12 +13,7 @@
 
 
 /*
-LoggerState just allocates one big block of memory of size
-and stores different stuff at different offsets such that the NN can just
-read portions of it as a single contiguous input tensor
-Unoccupied grid (5x5 bools) comes first, then the legal_moves tensor (5x5x10 bools)
-followed by the board grid (5x5x(5+3*num_players))
-The channels are:
+LoggerState array format:
 0: saplings               (1 / -1)
 1: young trees            (1 / -1)
 2: mature trees           (1 / -1)
@@ -33,52 +28,29 @@ The channels are:
 #define YOUNGTREES  1
 #define MATURETREES 2
 #define PROTESTERS  3
-#define PLAYERS     4
 
 
 typedef struct {
 	int8_t y;
-    int8_t x;
+  int8_t x;
 } Position;
 
 
 typedef struct {
-    Position positions[4];
-    int8_t scores[4];
-    int8_t protesters[4];
+  Position positions[4];
+  int8_t scores[4];
+  int8_t protesters[4];
 
 	int8_t board[5 * 5 * 4];
 	int8_t unoccupied[5 * 5];
 	int8_t legal_moves[5 * 5 * 10];
 
-    uint8_t num_players;
-    uint8_t num_unprotested_trees;
-    uint8_t current_player;
+  uint8_t num_players;
+  uint8_t num_unprotested_trees;
+  uint8_t current_player;
 
 } LoggerState;
 
-
-/* 
-  Initialise the memory for a LoggerState struct.
-  Doesn't set the memory to a valid game state.
-
-int LoggerState_init(LoggerState* state, uint8_t num_players) {
-
-    state->num_players = num_players;
-    state->unoccupied = malloc(25 * (1 + 10 + 4 + 3 * num_players));
-    if (state->unoccupied == NULL)
-    	return 0;
-    return 1;
-}
-
-  Uninitialise the memory in a LoggerState struct. 
-  Doesn't free the LoggerState struct.
-
-void LoggerState_uninit(LoggerState* state) {
-	if (state->unoccupied != NULL) 
-		free(state->unoccupied);
-}
-*/
 
 /* 
   Set the game state to a new game with random player positions
@@ -115,30 +87,99 @@ void LoggerState_reset(LoggerState* state, uint8_t num_players) {
 }
 
 
-int on_board(Position pos) {
-	return (pos.x >=0) && (pos.x < 5) && (pos.y >= 0) && (pos.y < 5);
-}
+#define ON_BOARD(px, py) ((px >=0) && (px < 5) && (py >= 0) && (py < 5))
 
 
 /* 
-  Compute the next game state after the given move, and put it in the output
-  state object.
+  Advance the game state according to the current player making the given move
 */
-void LoggerState_domove(LoggerState* in, LoggerState* out, int move) {
-	Position pos = {.y = move / 50, .x = (move % 50) / 10};
-	int action = move % 10;
+typedef struct {
+  int8_t y, x, action, protest_y, protest_x;
+} Move;
 
+void _grow(LoggerState* state);
+
+void LoggerState_domove(LoggerState* state, Move move) {
+	
 	// Move player
+  Position* pos = &state->positions[state->current_player];
+  state->unoccupied[5 * pos->y + pos->x] = 1;
+  pos->y = move.y;
+  pos->x = move.x;
+  state->unoccupied[5 * move.y + move.x] = 0;
 
+  _grow(state);
 
 }
 
+
+void _grow_square(LoggerState* state, int8_t* new_saplings, int8_t y, int8_t x) {
+  // Pointer to the given square in the board
+  int8_t* square = state->board + (5 * y + x) * 4;
+
+  if (square[SAPLINGS] == 1) {
+    if (new_saplings[5 * y + x])
+      return;  // This sapling spawned this turn, so doesn't grow
+    square[SAPLINGS] = -1;
+    square[YOUNGTREES] = 1;
+  }
+  else if (square[YOUNGTREES] == 1) {
+    square[YOUNGTREES] = -1;
+    square[MATURETREES] = 1;
+    state->num_unprotested_trees += 1;
+  }
+  else if (square[MATURETREES] == 1) {
+    // Remove this repetition
+    int8_t sq_x = x - 1, sq_y = y;
+    int8_t sq_yx = 5 * sq_y + sq_x;
+    if (ON_BOARD(sq_x, sq_y) && state->unoccupied[sq_yx]) {
+      state->board[sq_yx * 4 + SAPLINGS] = 1;
+      state->unoccupied[sq_yx] = 0;
+      new_saplings[sq_yx] = 1;
+    }
+    sq_x = x + 1;
+    sq_yx = 5 * sq_y + sq_x;
+    if (ON_BOARD(sq_x, sq_y) && state->unoccupied[sq_yx]) {
+      state->board[sq_yx * 4 + SAPLINGS] = 1;
+      state->unoccupied[sq_yx] = 0;
+      new_saplings[sq_yx] = 1;
+    }
+    sq_x = x, sq_y = y-1;
+    sq_yx = 5 * sq_y + sq_x;
+    if (ON_BOARD(sq_x, sq_y) && state->unoccupied[sq_yx]) {
+      state->board[sq_yx * 4 + SAPLINGS] = 1;
+      state->unoccupied[sq_yx] = 0;
+      new_saplings[sq_yx] = 1;
+    }
+    sq_y = y+1;
+    sq_yx = 5 * sq_y + sq_x;
+    if (ON_BOARD(sq_x, sq_y) && state->unoccupied[sq_yx]) {
+      state->board[sq_yx * 4 + SAPLINGS] = 1;
+      state->unoccupied[sq_yx] = 0;
+      new_saplings[sq_yx] = 1;
+    }
+  }
+}
+
+void _grow(LoggerState* state) {
+  int8_t new_saplings[5 * 5] = {0}; // Mark saplings that spawned this turn and so don't grow
+
+  Position player_pos = state->positions[state->current_player];
+  for (int8_t i = 0; i < 5; ++i) {
+    _grow_square(state, new_saplings, i, player_pos.x);
+    _grow_square(state, new_saplings, player_pos.y, i);
+  }
+}
+
+
 // ---------------------------- PyLoggerState wrapper ---------------------------- //
+
 
 typedef struct {
     PyObject_HEAD
     LoggerState* state;
 } PyLoggerState;
+
 
 static PyObject *
 PyLoggerState_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -157,11 +198,13 @@ PyLoggerState_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     return (PyObject *) self;
 }
 
+
 static void
 PyLoggerState_dealloc(PyLoggerState *self)
 {
     Py_TYPE(self)->tp_free((PyObject *) self);
 }
+
 
 static int
 PyLoggerState_init(PyLoggerState *self, PyObject *args, PyObject *kwds)
@@ -171,8 +214,9 @@ PyLoggerState_init(PyLoggerState *self, PyObject *args, PyObject *kwds)
     	return -1;
 
 	LoggerState_reset(self->state, PyLong_AsLong(num_players));
-    return 0;
+  return 0;
 }
+
 
 static PyObject*
 PyLoggerState_getarray(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
@@ -201,16 +245,26 @@ PyLoggerState_getarray(PyLoggerState *self, PyObject *Py_UNUSED(ignored))
 
 	for (int p = 0; p < state->num_players; ++p) {
 		Position pos = state->positions[(p + state->current_player) % state->num_players];
-		out_data[(5 * pos.y + pos.x) * num_channels + 4] = 1;
+		out_data[(5 * pos.y + pos.x) * num_channels + 4 + 3 * p] = 1;
 	}
 
 	return out_arr;
 }
 
+static PyObject*
+PyLoggerState_test(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
+{
+
+  Move move = {.y = 2, .x = 1, .action = 0, .protest_y = 0, .protest_x = 0};
+  LoggerState_domove(self->state, move);
+  Py_RETURN_NONE;
+}
 
 static PyMethodDef PyLoggerState_methods[] = {
     {"get_array", (PyCFunction) PyLoggerState_getarray, METH_NOARGS,
      "Get the board state as a numpy array"},
+    {"test", (PyCFunction) PyLoggerState_test, METH_NOARGS,
+     "Testing method"},
     {NULL}  /* Sentinel */
 };
 
