@@ -33,11 +33,14 @@ LoggerState array format:
 typedef struct {
 	int8_t y;
   int8_t x;
-} Position;
+} Vec2;
+
+
+Vec2 DIRECTIONS[] = {{-1, 0}, {0, -1}, {0, 1}, {1, 0}};
 
 
 typedef struct {
-  Position positions[4];
+  Vec2 positions[4];
   int8_t scores[4];
   int8_t protesters[4];
 
@@ -81,9 +84,13 @@ void LoggerState_reset(LoggerState* state, uint8_t num_players) {
 	}
 
 	// Place centre sapling
-	size_t pos = (2 * 5 + 2) * 4 + 0;  // Y=2, X=2, C=0
-	state->board[pos] = 1;
-	state->unoccupied[pos] = 0;
+  size_t pos = (2 * 5 + 2) * 4 + 0;  // Y=2, X=2, C=0
+  state->board[pos] = 1;
+  state->unoccupied[pos] = 0;
+
+  pos = (0 * 5 + 2) * 4 + 0;  // Y=0, X=2, C=0
+  state->board[pos] = 1;
+  state->unoccupied[pos] = 0;
 }
 
 
@@ -97,18 +104,25 @@ typedef struct {
   int8_t y, x, action, protest_y, protest_x;
 } Move;
 
+
+
 void _grow(LoggerState* state);
 
 void LoggerState_domove(LoggerState* state, Move move) {
 	
 	// Move player
-  Position* pos = &state->positions[state->current_player];
+  Vec2* pos = &state->positions[state->current_player];
   state->unoccupied[5 * pos->y + pos->x] = 1;
   pos->y = move.y;
   pos->x = move.x;
   state->unoccupied[5 * move.y + move.x] = 0;
 
   _grow(state);
+  if (move.action < 4) {
+    // CHOP
+  } else if (move.action < 8) {
+    _plant(state, move.action - 4);
+  }
 
 }
 
@@ -130,33 +144,16 @@ void _grow_square(LoggerState* state, int8_t* new_saplings, int8_t y, int8_t x) 
   }
   else if (square[MATURETREES] == 1) {
     // Remove this repetition
-    int8_t sq_x = x - 1, sq_y = y;
-    int8_t sq_yx = 5 * sq_y + sq_x;
-    if (ON_BOARD(sq_x, sq_y) && state->unoccupied[sq_yx]) {
-      state->board[sq_yx * 4 + SAPLINGS] = 1;
-      state->unoccupied[sq_yx] = 0;
-      new_saplings[sq_yx] = 1;
-    }
-    sq_x = x + 1;
-    sq_yx = 5 * sq_y + sq_x;
-    if (ON_BOARD(sq_x, sq_y) && state->unoccupied[sq_yx]) {
-      state->board[sq_yx * 4 + SAPLINGS] = 1;
-      state->unoccupied[sq_yx] = 0;
-      new_saplings[sq_yx] = 1;
-    }
-    sq_x = x, sq_y = y-1;
-    sq_yx = 5 * sq_y + sq_x;
-    if (ON_BOARD(sq_x, sq_y) && state->unoccupied[sq_yx]) {
-      state->board[sq_yx * 4 + SAPLINGS] = 1;
-      state->unoccupied[sq_yx] = 0;
-      new_saplings[sq_yx] = 1;
-    }
-    sq_y = y+1;
-    sq_yx = 5 * sq_y + sq_x;
-    if (ON_BOARD(sq_x, sq_y) && state->unoccupied[sq_yx]) {
-      state->board[sq_yx * 4 + SAPLINGS] = 1;
-      state->unoccupied[sq_yx] = 0;
-      new_saplings[sq_yx] = 1;
+    for (int i = 0; i < 4; ++i) {
+      Vec2 direction = DIRECTIONS[i];
+      int8_t sq_x = x + direction.x;
+      int8_t sq_y = y + direction.y;
+      int8_t sq_yx = 5 * sq_y + sq_x;
+      if (ON_BOARD(sq_x, sq_y) && state->unoccupied[sq_yx]) {
+        state->board[sq_yx * 4 + SAPLINGS] = 1;
+        state->unoccupied[sq_yx] = 0;
+        new_saplings[sq_yx] = 1;
+      }
     }
   }
 }
@@ -164,13 +161,22 @@ void _grow_square(LoggerState* state, int8_t* new_saplings, int8_t y, int8_t x) 
 void _grow(LoggerState* state) {
   int8_t new_saplings[5 * 5] = {0}; // Mark saplings that spawned this turn and so don't grow
 
-  Position player_pos = state->positions[state->current_player];
+  Vec2 player_pos = state->positions[state->current_player];
   for (int8_t i = 0; i < 5; ++i) {
     _grow_square(state, new_saplings, i, player_pos.x);
     _grow_square(state, new_saplings, player_pos.y, i);
   }
 }
 
+void _plant(LoggerState* state, int direction) {
+  Vec2 player_pos = state->positions[state->current_player];
+  Vec2 direction = DIRECTIONS[direction];
+  int8_t y = player_pos.y + direction.y;
+  int8_t x = player_pos.x + direction.x;
+  int8_t yx = 5 * y + x;
+  state->board[yx * 4 + SAPLINGS] = 1;
+  state->unoccupied[yx] = 0;
+}
 
 // ---------------------------- PyLoggerState wrapper ---------------------------- //
 
@@ -244,7 +250,7 @@ PyLoggerState_getarray(PyLoggerState *self, PyObject *Py_UNUSED(ignored))
 	}
 
 	for (int p = 0; p < state->num_players; ++p) {
-		Position pos = state->positions[(p + state->current_player) % state->num_players];
+		Vec2 pos = state->positions[(p + state->current_player) % state->num_players];
 		out_data[(5 * pos.y + pos.x) * num_channels + 4 + 3 * p] = 1;
 	}
 
@@ -255,7 +261,7 @@ static PyObject*
 PyLoggerState_test(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
 {
 
-  Move move = {.y = 2, .x = 1, .action = 0, .protest_y = 0, .protest_x = 0};
+  Move move = {.y = 4, .x = 2, .action = 0, .protest_y = 0, .protest_x = 0};
   LoggerState_domove(self->state, move);
   Py_RETURN_NONE;
 }
