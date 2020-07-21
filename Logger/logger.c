@@ -36,7 +36,20 @@ typedef struct {
 } Vec2;
 
 
-Vec2 DIRECTIONS[] = {{-1, 0}, {0, -1}, {0, 1}, {1, 0}};
+Vec2 DIRECTIONS[] = {
+  {-1,  0},
+  { 0, -1},
+  { 0,  1},
+  { 1,  0},
+};
+
+Vec2 MOTIONS[] = {
+  {-2,  0},
+  {-1, -1}, {-1,  0}, {-1,  1},
+  { 0, -2}, { 0, -1}, { 0,  0}, {0, 1}, {0, 2},
+  { 1, -1}, { 1,  0}, { 1,  1},
+  { 2,  0},
+};
 
 
 typedef struct {
@@ -105,8 +118,10 @@ typedef struct {
 void _grow(LoggerState* state);
 void _plant(LoggerState* state, int direction_idx);
 void _chop(LoggerState* state, int direction_idx);
+void _protest(LoggerState* state, int8_t y, int8_t x);
 
-void LoggerState_domove(LoggerState* state, Move move) {
+
+int LoggerState_domove(LoggerState* state, Move move) {
 	
 	// Move player
   Vec2* pos = &state->positions[state->current_player];
@@ -115,13 +130,29 @@ void LoggerState_domove(LoggerState* state, Move move) {
   pos->x = move.x;
   state->unoccupied[5 * move.y + move.x] = 0;
 
+  // Do action
   _grow(state);
   if (move.action < 4) {
     _chop(state, move.action);
   } else if (move.action < 8) {
     _plant(state, move.action - 4);
+  } else if (move.action == 8) {
+    _protest(state, move.protest_y, move.protest_x);
+  } 
+  // Action 9 is a pass that does nothing
+
+  // Check for winner
+  for (int p = 0; p < state->num_players; ++p) {
+    if (state->scores[p] >= 10) 
+      return p;
   }
 
+  state->current_player = (state->current_player + 1) % state->num_players;
+
+  // TODO: Compute legal moves
+
+  // No winner
+  return -1;
 }
 
 
@@ -197,6 +228,62 @@ void _chop(LoggerState* state, int direction_idx) {
       state->num_unprotested_trees -= 1;
     }
   }
+}
+
+void _protest(LoggerState* state, int8_t y, int8_t x) {
+  state->board[(5 * y + x) * 4 + PROTESTERS] = 1;
+  state->protesters[state->current_player] -= 1;
+  state->num_unprotested_trees -= 1;
+}
+
+void _update_legal_moves(LoggerState* state) {
+
+  // Temporarily unoccupy current space. Reset at end of function
+  Vec2 player_pos = state->positions[state->current_player];
+  int player_yx = player_pos.y * 5 + player_pos.x;
+  state->unoccupied[player_yx] = 1;
+
+  memset(state->legal_moves, 0, sizeof(state->legal_moves));
+
+  int8_t can_protest = state->num_unprotested_trees > 0 
+                     && state->protesters[state->current_player] > 0;
+
+  int8_t legal_motions[13];
+
+  for (int i = 0; i < 13; ++i) {
+    Vec2 pos = MOTIONS[i];
+    pos.y += player_pos.y;
+    pos.x += player_pos.x;
+
+    legal_motions[i] = ON_BOARD(pos.y, pos.x) && state->unoccupied[5 * pos.y + pos.x];
+    if (!legal_motions[i]) 
+      continue;
+
+    // Chops and Plants
+    for (int d_i = 0; d_i < 4; ++d_i) {
+      Vec2 square = DIRECTIONS[d_i];
+      square.x += pos.x;
+      square.y += pos.y;
+      if (!ON_BOARD(square.y, square.x))
+        continue;
+
+      int sq_yx = 5 * square.y + square.x;
+      int sq_yx4 = sq_yx * 4;
+
+      // Can chop if there's an unprotested mature tree or a young tree that will grow
+      if (state->board[sq_yx4 + YOUNGTREES] == 1
+          || (state->board[sq_yx4 + MATURETREES] == 1 && state->board[sq_yx4 + PROTESTERS] != 1)) {
+        state->legal_moves[sq_yx * 10 + d_i] = 1;
+      }
+
+      // Can plant if the square is empty
+      // (The square after can't be mature, or a new sapling will spawn here during _grow)
+      
+    }
+
+  }
+
+  state->unoccupied[player_yx] = 0;
 }
 
 // ---------------------------- PyLoggerState wrapper ---------------------------- //
