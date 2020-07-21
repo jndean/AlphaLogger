@@ -87,10 +87,6 @@ void LoggerState_reset(LoggerState* state, uint8_t num_players) {
   size_t pos = (2 * 5 + 2) * 4 + 0;  // Y=2, X=2, C=0
   state->board[pos] = 1;
   state->unoccupied[pos] = 0;
-
-  pos = (0 * 5 + 2) * 4 + 0;  // Y=0, X=2, C=0
-  state->board[pos] = 1;
-  state->unoccupied[pos] = 0;
 }
 
 
@@ -107,6 +103,8 @@ typedef struct {
 
 
 void _grow(LoggerState* state);
+void _plant(LoggerState* state, int direction_idx);
+void _chop(LoggerState* state, int direction_idx);
 
 void LoggerState_domove(LoggerState* state, Move move) {
 	
@@ -119,7 +117,7 @@ void LoggerState_domove(LoggerState* state, Move move) {
 
   _grow(state);
   if (move.action < 4) {
-    // CHOP
+    _chop(state, move.action);
   } else if (move.action < 8) {
     _plant(state, move.action - 4);
   }
@@ -168,14 +166,37 @@ void _grow(LoggerState* state) {
   }
 }
 
-void _plant(LoggerState* state, int direction) {
+void _plant(LoggerState* state, int direction_idx) {
   Vec2 player_pos = state->positions[state->current_player];
-  Vec2 direction = DIRECTIONS[direction];
+  Vec2 direction = DIRECTIONS[direction_idx];
   int8_t y = player_pos.y + direction.y;
   int8_t x = player_pos.x + direction.x;
   int8_t yx = 5 * y + x;
   state->board[yx * 4 + SAPLINGS] = 1;
   state->unoccupied[yx] = 0;
+}
+
+void _chop(LoggerState* state, int direction_idx) {
+  int current_player = state->current_player;
+  Vec2 square = state->positions[current_player];
+  Vec2 direction = DIRECTIONS[direction_idx];
+  while (1) {
+    square.y += direction.y;
+    square.x += direction.x;
+    int8_t yx = 5 * square.y + square.x;
+    int8_t yx4 = yx * 4;
+    if (!(ON_BOARD(square.y, square.x) && state->board[yx4 + MATURETREES] == 1))
+      break;
+    state->board[yx4 + MATURETREES] = -1;
+    state->unoccupied[yx] = 1;
+    state->scores[current_player] += 1;
+    if (state->board[yx4 + PROTESTERS] == 1) {
+      state->board[yx4 + PROTESTERS] = -1;
+      state->protesters[current_player] += 1;
+    } else {
+      state->num_unprotested_trees -= 1;
+    }
+  }
 }
 
 // ---------------------------- PyLoggerState wrapper ---------------------------- //
@@ -261,7 +282,13 @@ static PyObject*
 PyLoggerState_test(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
 {
 
-  Move move = {.y = 4, .x = 2, .action = 0, .protest_y = 0, .protest_x = 0};
+  Move move = {.y = 3, .x = 2, .action = 4, .protest_y = 0, .protest_x = 0};
+  LoggerState_domove(self->state, move);
+  for (int i=0; i < 10; ++i){
+    move = (Move){.y = 3, .x = 2, .action = 9, .protest_y = 0, .protest_x = 0};
+    LoggerState_domove(self->state, move);
+  }
+  move = (Move){.y = 3, .x = 2, .action = 0, .protest_y = 0, .protest_x = 0};
   LoggerState_domove(self->state, move);
   Py_RETURN_NONE;
 }
