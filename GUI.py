@@ -14,17 +14,11 @@ class MatchGUI:
         self.num_players = len(players)
 
         self.game_state = LoggerState(self.num_players)
-        while (self.game_state.get_array()[0, 0, 4] != 1):
-            self.game_state = LoggerState(self.num_players)
-        self.game_state.test()
-        self.game_state.test()
-        self.game_state.test()
-        self.game_state.test()
 
         self.num_actions = 10
 
         self.window, self.grid = None, None
-        self.chosen_motion, self.chosen_action = None, None
+        self.chosen_motion, self.chosen_action self.chosen_protester = None, None, None
 
         self.game_over = False
         self.input_lock = False
@@ -40,7 +34,7 @@ class MatchGUI:
         self.grid = [[], [], [], [], []]
         for row_num in range(5):
             for col_num in range(5):
-                label = tk.Label(
+                label = tk.Button(
                     width=10, height=5, borderwidth=2, relief="groove", master=grid_frame
                 )
                 label.grid(row=row_num, column=col_num)
@@ -89,11 +83,10 @@ class MatchGUI:
             text="No Action", width=12, height=1, master=extras_frame,
             command=lambda: self.set_action(7 + self.num_players)
         ).pack()
-        for player in range(self.num_players - 1):
-            tk.Button(
-                text="Protest", width=12, height=1, master=extras_frame,
-                command=lambda: self.set_action(8 + player)
-            ).pack()
+        tk.Button(
+            text="Protest", width=12, height=1, master=extras_frame,
+            command=lambda: self.set_action(8)
+        ).pack()
         extras_frame.grid(row=0, column=3, padx=25)
 
         layout.pack()
@@ -113,6 +106,11 @@ class MatchGUI:
         self.chosen_action = idx
         self.continue_game()
         self.input_lock = False
+
+    def set_protester(self, xy):
+        if self.input_lock:
+            return
+        self.chosen_protester = xy
 
     def continue_game(self):
         while not self.game_over:
@@ -152,8 +150,7 @@ class MatchGUI:
         self.message_box['text'] = message
 
     def draw(self):
-        board = self.game_state.get_array()
-        print(board)
+        board = self.game_state.get_state_array()
         for y in range(5):
             for x in range(5):
                 if board[y, x, 0] == 1:

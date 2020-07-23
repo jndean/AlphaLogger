@@ -119,6 +119,7 @@ void _grow(LoggerState* state);
 void _plant(LoggerState* state, int direction_idx);
 void _chop(LoggerState* state, int direction_idx);
 void _protest(LoggerState* state, int8_t y, int8_t x);
+void _update_legal_moves(LoggerState* state);
 
 
 int LoggerState_domove(LoggerState* state, Move move) {
@@ -147,16 +148,15 @@ int LoggerState_domove(LoggerState* state, Move move) {
       return p;
   }
 
+  // Move to next turn
   state->current_player = (state->current_player + 1) % state->num_players;
+  _update_legal_moves(state);
 
-  // TODO: Compute legal moves
-
-  // No winner
-  return -1;
+  return -1;  // No winner
 }
 
 
-void _grow_square(LoggerState* state, int8_t* new_saplings, int8_t y, int8_t x) {
+void __grow_square(LoggerState* state, int8_t* new_saplings, int8_t y, int8_t x) {
   // Pointer to the given square in the board
   int8_t* square = state->board + (5 * y + x) * 4;
 
@@ -192,8 +192,8 @@ void _grow(LoggerState* state) {
 
   Vec2 player_pos = state->positions[state->current_player];
   for (int8_t i = 0; i < 5; ++i) {
-    _grow_square(state, new_saplings, i, player_pos.x);
-    _grow_square(state, new_saplings, player_pos.y, i);
+    __grow_square(state, new_saplings, i, player_pos.x);
+    __grow_square(state, new_saplings, player_pos.y, i);
   }
 }
 
@@ -236,6 +236,7 @@ void _protest(LoggerState* state, int8_t y, int8_t x) {
   state->num_unprotested_trees -= 1;
 }
 
+
 void _update_legal_moves(LoggerState* state) {
 
   // Temporarily unoccupy current space. Reset at end of function
@@ -248,24 +249,47 @@ void _update_legal_moves(LoggerState* state) {
   int8_t can_protest = state->num_unprotested_trees > 0 
                      && state->protesters[state->current_player] > 0;
 
+  // For a motion to be legal, the destination must be unoccupied and on the board.
   int8_t legal_motions[13];
-
   for (int i = 0; i < 13; ++i) {
     Vec2 pos = MOTIONS[i];
     pos.y += player_pos.y;
     pos.x += player_pos.x;
-
     legal_motions[i] = ON_BOARD(pos.y, pos.x) && state->unoccupied[5 * pos.y + pos.x];
+  }
+
+  // Additionally, the two-square motions require the intermediate square to be legal
+  legal_motions[1] &= legal_motions[2] || legal_motions[5];
+  legal_motions[3] &= legal_motions[2] || legal_motions[7];
+  legal_motions[9] &= legal_motions[5] || legal_motions[10];
+  legal_motions[11] &= legal_motions[7] || legal_motions[10];
+  legal_motions[0] &= legal_motions[2];
+  legal_motions[4] &= legal_motions[5];
+  legal_motions[8] &= legal_motions[7];
+  legal_motions[12] &= legal_motions[10];
+
+  // For each legal motion, compute the subsequent legal actions
+  for (int i = 0; i < 13; ++i) {
     if (!legal_motions[i]) 
       continue;
+    Vec2 pos = MOTIONS[i];
+    pos.y += player_pos.y;
+    pos.x += player_pos.x;
+    int pos_yx = (5 * pos.y + pos.x) * 10;
 
-    // Chops and Plants
+    int8_t actions_available = can_protest;
+
+    // Chops and plants can happen in 4 directions
     for (int d_i = 0; d_i < 4; ++d_i) {
-      Vec2 square = DIRECTIONS[d_i];
+      Vec2 direction = DIRECTIONS[d_i];
+      Vec2 square = direction;
       square.x += pos.x;
       square.y += pos.y;
       if (!ON_BOARD(square.y, square.x))
         continue;
+      Vec2 next_square = square;
+      next_square.x += direction.x;
+      next_square.y += direction.y;
 
       int sq_yx = 5 * square.y + square.x;
       int sq_yx4 = sq_yx * 4;
@@ -274,15 +298,27 @@ void _update_legal_moves(LoggerState* state) {
       if (state->board[sq_yx4 + YOUNGTREES] == 1
           || (state->board[sq_yx4 + MATURETREES] == 1 && state->board[sq_yx4 + PROTESTERS] != 1)) {
         state->legal_moves[sq_yx * 10 + d_i] = 1;
-      }
+        actions_available = 1;
+      } 
 
       // Can plant if the square is empty
       // (The square after can't be mature, or a new sapling will spawn here during _grow)
-      
+      else if (state->unoccupied[sq_yx]
+               && (!ON_BOARD(next_square.y, next_square.x) 
+                   || state->board[(5 * next_square.y + next_square.x) * 4 + MATURETREES] != 1)) {
+        state->legal_moves[sq_yx * 10 + 4 + d_i] = 1;
+        actions_available = 1;
+      }
     }
 
+    // Can play a protester if you have one and there's a suitable tree (not square dependent)
+    state->legal_moves[pos_yx + 8] = can_protest;
+
+    // Not actions available in this position, so pass is legal
+    state->legal_moves[pos_yx + 9] = !actions_available;
   }
 
+  // Reset temporary change to occupation of current space
   state->unoccupied[player_yx] = 0;
 }
 
@@ -333,13 +369,15 @@ PyLoggerState_init(PyLoggerState *self, PyObject *args, PyObject *kwds)
 
 
 static PyObject*
-PyLoggerState_getarray(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
+PyLoggerState_getstatearray(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
 {
 	LoggerState* state = self->state;
 
 	const int num_channels = 4 + 3 * state->num_players;
 	npy_intp dims[] = {5, 5, num_channels};
 	PyObject *out_arr = PyArray_SimpleNew(3, dims, NPY_INT8);
+  if (out_arr == NULL) 
+    return NULL;
 
 	int8_t* out_data = PyArray_GETPTR1((PyArrayObject*) out_arr, 0);
 	for(int xy = 0; xy < 25; ++xy) {
@@ -365,6 +403,17 @@ PyLoggerState_getarray(PyLoggerState *self, PyObject *Py_UNUSED(ignored))
 	return out_arr;
 }
 
+
+static PyObject*
+PyLoggerState_getlegalmovesarray(PyLoggerState *self, PyObject *Py_UNUSED(ignored))
+{
+  static npy_intp dims[] = {5, 5, 10};
+  return PyArray_SimpleNewFromData(
+    3, dims, NPY_INT8, self->state->legal_moves
+  );
+}
+
+
 static PyObject*
 PyLoggerState_test(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
 {
@@ -381,8 +430,10 @@ PyLoggerState_test(PyLoggerState *self, PyObject *Py_UNUSED(ignored))
 }
 
 static PyMethodDef PyLoggerState_methods[] = {
-    {"get_array", (PyCFunction) PyLoggerState_getarray, METH_NOARGS,
+    {"get_state_array", (PyCFunction) PyLoggerState_getstatearray, METH_NOARGS,
      "Get the board state as a numpy array"},
+    {"get_legal_moves_array", (PyCFunction) PyLoggerState_getlegalmovesarray, METH_NOARGS,
+     "Get the legal move mask"},
     {"test", (PyCFunction) PyLoggerState_test, METH_NOARGS,
      "Testing method"},
     {NULL}  /* Sentinel */
