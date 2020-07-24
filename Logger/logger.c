@@ -288,6 +288,7 @@ void _update_legal_moves(LoggerState* state) {
       Vec2 square = direction;
       square.x += pos.x;
       square.y += pos.y;
+
       if (!ON_BOARD(square.y, square.x))
         continue;
       Vec2 next_square = square;
@@ -300,7 +301,7 @@ void _update_legal_moves(LoggerState* state) {
       // Can chop if there's an unprotested mature tree or a young tree that will grow
       if (state->board[sq_yx4 + YOUNGTREES] == 1
           || (state->board[sq_yx4 + MATURETREES] == 1 && state->board[sq_yx4 + PROTESTERS] != 1)) {
-        state->legal_moves[sq_yx * 10 + d_i] = 1;
+        state->legal_moves[pos_yx + d_i] = 1;
         actions_available = 1;
       } 
 
@@ -309,7 +310,7 @@ void _update_legal_moves(LoggerState* state) {
       else if (state->unoccupied[sq_yx]
                && (!ON_BOARD(next_square.y, next_square.x) 
                    || state->board[(5 * next_square.y + next_square.x) * 4 + MATURETREES] != 1)) {
-        state->legal_moves[sq_yx * 10 + 4 + d_i] = 1;
+        state->legal_moves[pos_yx + 4 + d_i] = 1;
         actions_available = 1;
       }
     }

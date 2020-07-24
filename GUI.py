@@ -77,7 +77,7 @@ class MatchGUI:
 
         plant_frame = tk.Frame(master=layout)
         for i, ((y, x), label) in enumerate([
-            ((2, 1), "↓"), ((1, 0), "←"), ((1, 2), "→"), ((0, 1), "↑"), 
+            ((0, 1), "↑"), ((1, 0), "←"), ((1, 2), "→"), ((2, 1), "↓"), 
         ]):
             add_button(y, x, label, plant_frame, self.set_action, i+4)
         tk.Label(text="PLANT", master=plant_frame).grid(row=1, column=1, padx=5, pady=5)
