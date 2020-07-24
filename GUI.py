@@ -14,11 +14,13 @@ class MatchGUI:
         self.num_players = len(players)
 
         self.game_state = LoggerState(self.num_players)
+        while (self.game_state.get_player_positions()[0] != (0, 0)):
+            self.game_state = LoggerState(self.num_players)
 
         self.num_actions = 10
 
         self.window, self.grid = None, None
-        self.chosen_motion, self.chosen_action self.chosen_protester = None, None, None
+        self.chosen_motion, self.chosen_action, self.chosen_protester = None, None, None
 
         self.game_over = False
         self.input_lock = False
@@ -32,10 +34,13 @@ class MatchGUI:
         layout = tk.Frame()
         grid_frame = tk.Frame(master=layout)
         self.grid = [[], [], [], [], []]
+        def make_protester_method(y, x):
+            return lambda: self.set_protester((y, x))
         for row_num in range(5):
             for col_num in range(5):
                 label = tk.Button(
-                    width=10, height=5, borderwidth=2, relief="groove", master=grid_frame
+                    width=10, height=5, borderwidth=2, relief="groove", master=grid_frame,
+                    command=make_protester_method(row_num, col_num)
                 )
                 label.grid(row=row_num, column=col_num)
                 self.grid[row_num].append(label)
@@ -59,7 +64,7 @@ class MatchGUI:
             ((3, 1), "↙"), ((3, 2), "↓"), ((3, 3), "↘"),
             ((4, 2), "↡")
         ]):
-            add_button(y, x, label, direction_frame, self.set_motion, i)
+            add_button(y, x, label, direction_frame, self.set_motion, (y-2, x-2))
         direction_frame.grid(row=0, column=1, rowspan=2, padx=5, pady=5)
 
         chop_frame = tk.Frame(master=layout)
@@ -72,7 +77,7 @@ class MatchGUI:
 
         plant_frame = tk.Frame(master=layout)
         for i, ((y, x), label) in enumerate([
-            ((0, 1), "↑"), ((1, 0), "←"), ((1, 2), "→"), ((2, 1), "↓")
+            ((2, 1), "↓"), ((1, 0), "←"), ((1, 2), "→"), ((0, 1), "↑"), 
         ]):
             add_button(y, x, label, plant_frame, self.set_action, i+4)
         tk.Label(text="PLANT", master=plant_frame).grid(row=1, column=1, padx=5, pady=5)
@@ -81,7 +86,7 @@ class MatchGUI:
         extras_frame = tk.Frame(master=layout)
         tk.Button(
             text="No Action", width=12, height=1, master=extras_frame,
-            command=lambda: self.set_action(7 + self.num_players)
+            command=lambda: self.set_action(9)
         ).pack()
         tk.Button(
             text="Protest", width=12, height=1, master=extras_frame,
@@ -108,6 +113,7 @@ class MatchGUI:
         self.input_lock = False
 
     def set_protester(self, xy):
+        print(xy)
         if self.input_lock:
             return
         self.chosen_protester = xy
@@ -115,14 +121,22 @@ class MatchGUI:
     def continue_game(self):
         while not self.game_over:
             current_player = self.players[0]
-            if isinstance(current_player, Player.Human):
-                if self.chosen_motion is None or self.chosen_action is None:
+            if isinstance(current_player, Human):
+                if None in [self.chosen_motion, self.chosen_action]:
                     return
-                move = self.num_actions * self.chosen_motion + self.chosen_action
-                self.chosen_motion, self.chosen_action = None, None
-                if not self.board.legal_moves[move]:
-                    self.print(f"Illegal move ({move})")
-                    print(self.board.legal_moves.reshape((13, -1)))
+                player_y, player_x = self.game_state.get_player_positions()[0]
+                move_y = player_y + self.chosen_motion[0]
+                move_x = player_x + self.chosen_motion[1]
+                move_action = self.chosen_action
+
+                self.chosen_motion, self.chosen_action= None, None
+                if not (0 <= move_y < 5 and 0 <= move_x < 5 and
+                       self.game_state.get_legal_moves_array()[move_y, move_x, move_action]):
+                    self.print(f"Illegal move ({move_y}, {move_x}, {move_action})")
+                    print(self.game_state.get_legal_moves_array().reshape((5, 5, 10))[move_y, move_x])
+                    return
+                else:
+                    self.print(f"Good move ({move_y}, {move_x}, {move_action})")
                     return
             else:
                 move = current_player.choose_move(self.board)
@@ -170,10 +184,16 @@ class MatchGUI:
                         label = ""
                 self.grid[y][x]['text'] = label
 
+    def compute_motion(self, motion_idx):
+        motions = (())
+
 
 class Player:
     def __init__(self, ID):
         self.id = ID
+
+class Human(Player):
+    pass
 
 
 if __name__ == '__main__':
@@ -182,7 +202,7 @@ if __name__ == '__main__':
 
     match = MatchGUI(
         players=[
-            Player('Human'),
-            Player("NotHuman"),
+            Human('Human'),
+            Human("NotHuman"),
         ]
     )
