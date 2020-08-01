@@ -129,36 +129,46 @@ class MatchGUI:
                 move_x = player_x + self.chosen_motion[1]
                 move_action = self.chosen_action
 
-                self.chosen_motion, self.chosen_action= None, None
-                if not (0 <= move_y < 5 and 0 <= move_x < 5 and
-                       self.game_state.get_legal_moves_array()[move_y, move_x, move_action]):
-                    self.print(f"Illegal move ({move_y}, {move_x}, {move_action})")
-                    print(self.game_state.get_legal_moves_array().reshape((5, 5, 10))[move_y, move_x])
+                protest_y, protest_x = 0, 0
+                if move_action == 8:
+                    protest_y, protest_x = self.chosen_protester
+
+
+                self.chosen_motion, self.chosen_action, self.chosen_protester = None, None, None
+                if not (0 <= move_y < 5 
+                        and 0 <= move_x < 5
+                        and self.game_state.get_legal_moves_array()[move_y, move_x, move_action]
+                        and self._check_protest(move_action, protest_y, protest_x)):
+                    self.print(f"Illegal move [({move_y}, {move_x}), {move_action}, ({protest_y}, {protest_x})]")
                     return
-                else:
-                    self.print(f"Good move ({move_y}, {move_x}, {move_action})")
-                    return
+                move = (move_y, move_x, move_action, protest_y, protest_x)
             else:
                 move = current_player.choose_move(self.board)
 
-            message = f'"{current_player.id}" plays {Game.stringify_move(move, self.num_players)}'
-            if not self.board.legal_moves[move]:
-                message += ". That's illegal!"
+            message = "Legal move"  # f'"{current_player.id}" plays {Game.stringify_move(move, self.num_players)}'
             self.print(message)
 
-            final_scores = self.board.do_move(move)
+            final_scores = self.game_state.do_move(*move)
             for player in self.players:
                 player.done_move(move)
 
+            """
             if final_scores is not None:
                 self.draw()
                 winner = self.players[np.argmax(final_scores)]
                 self.print(f"{winner.id} wins!")
                 self.game_over = True
                 return
+            """
 
             self.players.rotate(-1)
             self.draw()
+
+    def _check_protest(self, action, y, x):
+        if action != 8:  # Not protesting
+            return True
+        state = self.game_state.get_state_array()
+        return state[y, x, 2] == 1 and state[y, x, 3] != 1
 
     def print(self, message):
         self.message_box['text'] = message
@@ -191,6 +201,9 @@ class MatchGUI:
 class Player:
     def __init__(self, ID):
         self.id = ID
+
+    def done_move(self, move):
+        pass
 
 class Human(Player):
     pass
