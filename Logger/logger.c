@@ -6,6 +6,8 @@
 #include<stdlib.h>
 #include<stdint.h>
 
+#include<omp.h>
+
 #include<Python.h>
 #include <numpy/arrayobject.h>
 
@@ -456,6 +458,25 @@ static PyObject*
 PyLoggerState_test(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
 {
 
+  omp_set_num_threads(10);
+  #pragma omp parallel for
+  for (int game_num = 0; game_num < 1000000; ++game_num) {
+    LoggerState* state = malloc(sizeof(LoggerState));
+    LoggerState_reset(state, self->state->num_players);
+    for (int move_num = 0; move_num < 25; ++move_num) {
+        int move_idx;
+        for (int i = 0; i < sizeof(state->legal_moves); ++i) {
+            if (state->legal_moves[i] && i % 10 != 8) {
+                move_idx = i;
+                break;
+            }
+        }
+        Move move = {move_idx / 50, (move_idx / 10) % 5, move_idx % 10, 0, 0};
+        LoggerState_domove(state, move);
+    }
+    free(state);
+  }
+  /*
   Move move = {.y = 3, .x = 2, .action = 4, .protest_y = 0, .protest_x = 0};
   LoggerState_domove(self->state, move);
   for (int i=0; i < 10; ++i){
@@ -464,6 +485,7 @@ PyLoggerState_test(PyLoggerState *self, PyObject *Py_UNUSED(ignored))
   }
   move = (Move){.y = 3, .x = 2, .action = 0, .protest_y = 0, .protest_x = 0};
   LoggerState_domove(self->state, move);
+  */
   Py_RETURN_NONE;
 }
 
