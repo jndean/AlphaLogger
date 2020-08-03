@@ -131,17 +131,23 @@ class MatchGUI:
 
                 protest_y, protest_x = 0, 0
                 if move_action == 8:
+                    if self.chosen_protester is None:
+                        return
                     protest_y, protest_x = self.chosen_protester
 
+                move = (move_y, move_x, move_action, protest_y, protest_x)
 
                 self.chosen_motion, self.chosen_action, self.chosen_protester = None, None, None
+                print('Checking move:', self.game_state.get_legal_moves_array()[move_y, move_x])
                 if not (0 <= move_y < 5 
                         and 0 <= move_x < 5
                         and self.game_state.get_legal_moves_array()[move_y, move_x, move_action]
-                        and self._check_protest(move_action, protest_y, protest_x)):
+                        and self._check_protest(move)):
                     self.print(f"Illegal move [({move_y}, {move_x}), {move_action}, ({protest_y}, {protest_x})]")
                     return
-                move = (move_y, move_x, move_action, protest_y, protest_x)
+                else:
+                    print('Legal move:', self.game_state.get_legal_moves_array()[move_y, move_x])
+
             else:
                 move = current_player.choose_move(self.board)
 
@@ -164,11 +170,23 @@ class MatchGUI:
             self.players.rotate(-1)
             self.draw()
 
-    def _check_protest(self, action, y, x):
-        if action != 8:  # Not protesting
-            return True
+    def _check_protest(self, move):
+        y, x, action, protest_y, protest_x = move
         state = self.game_state.get_state_array()
-        return state[y, x, 2] == 1 and state[y, x, 3] != 1
+        if action != 8:
+            # Not protesting
+            return True  
+        if state[protest_y, protest_x, 3] == 1:
+            # Already protested
+            return False
+        if state[protest_y, protest_x, 2] == 1:
+            # Mature tree to cut
+            return True
+        if (state[protest_y, protest_x, 1] == 1 
+                and (protest_y == y or protest_x == x)):
+            # Young tree will grow to mature tree this turn
+            return True
+        return False
 
     def print(self, message):
         self.message_box['text'] = message

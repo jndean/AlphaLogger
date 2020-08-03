@@ -249,6 +249,8 @@ void _update_legal_moves(LoggerState* state) {
 
   memset(state->legal_moves, 0, sizeof(state->legal_moves));
 
+  // TODO: This doesn't take into account young trees that will grow this turn,
+  // but for the moment protesting isn't used so that's ok...
   int8_t can_protest = state->num_unprotested_trees > 0 
                      && state->protesters[state->current_player] > 0;
 

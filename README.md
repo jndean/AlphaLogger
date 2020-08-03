@@ -11,8 +11,6 @@ Tasks:
 - [x] A POC python implementation of the Monte Carlo Tree Search
 - [x] A Keras implementation of the AlphaZero ResNet, and an agent applying it via the MCTS
 - [x] A POC python implementation of the self-play and training pipeline
-
-- [ ] An efficient and thread-safe C implementation of Logger [ IN PROGRESS ]
-
-- [ ] An efficient and thread-safe C implementation of the MCTS
+- [x] An efficient and thread-safe C implementation of Logger
+- [ ] An efficient and thread-safe C implementation of the MCTS [ IN PROGRESS ]
 - [ ] A fully parallelised self-play and training pipeline
