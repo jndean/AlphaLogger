@@ -66,6 +66,7 @@ typedef struct {
   uint8_t num_players;
   uint8_t num_unprotested_trees;
   uint8_t current_player;
+  uint8_t game_over;
 
 } LoggerState;
 
@@ -87,6 +88,7 @@ void LoggerState_reset(LoggerState* state, uint8_t num_players) {
   state->num_players = num_players;
   state->num_unprotested_trees = 0;
   state->current_player = 0;
+  state->game_over = 0;
 
   // Place players
   int corner;
@@ -149,8 +151,10 @@ int LoggerState_domove(LoggerState* state, Move move) {
 
   // Check for winner
   for (int p = 0; p < state->num_players; ++p) {
-    if (state->scores[p] >= 10) 
+    if (state->scores[p] >= 10) {
+      state->game_over = 1;
       return p;
+    }
   }
 
   // Move to next turn
@@ -330,6 +334,36 @@ void _update_legal_moves(LoggerState* state) {
   state->unoccupied[player_yx] = 0;
 }
 
+/*
+    Generate the array representation of the game state which can be 
+    interpretted by the Neural Network
+*/ 
+void LoggerState_getstatearray(LoggerState* state, int8_t* out_array) {
+
+  const int num_channels = 4 + 3 * state->num_players;
+
+  for(int xy = 0; xy < 25; ++xy) {
+    int8_t* in = state->board + xy * 4;
+    int8_t* out = out_array + xy * num_channels;
+    *(out++) = *(in++);
+    *(out++) = *(in++);
+    *(out++) = *(in++);
+    *(out++) = *(in);
+    for (int p = 0; p < state->num_players; ++p) {
+      int p_actual = (p + state->current_player) % state->num_players;
+      *(out++) = -1;
+      *(out++) = state->scores[p_actual];
+      *(out++) = state->protesters[p_actual];
+    }
+  }
+
+  for (int p = 0; p < state->num_players; ++p) {
+    Vec2 pos = state->positions[(p + state->current_player) % state->num_players];
+    out_array[(5 * pos.y + pos.x) * num_channels + 4 + 3 * p] = 1;
+  }
+}
+
+
 // ---------------------------- PyLoggerState wrapper ---------------------------- //
 
 
@@ -379,34 +413,14 @@ PyLoggerState_init(PyLoggerState *self, PyObject *args, PyObject *kwds)
 static PyObject*
 PyLoggerState_getstatearray(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
 {
-  LoggerState* state = self->state;
-
-  const int num_channels = 4 + 3 * state->num_players;
+  const int num_channels = 4 + 3 * self->state->num_players;
   npy_intp dims[] = {5, 5, num_channels};
   PyObject *out_arr = PyArray_SimpleNew(3, dims, NPY_INT8);
   if (out_arr == NULL) 
     return NULL;
 
   int8_t* out_data = PyArray_GETPTR1((PyArrayObject*) out_arr, 0);
-  for(int xy = 0; xy < 25; ++xy) {
-    int8_t* in = state->board + xy * 4;
-    int8_t* out = out_data + xy * num_channels;
-    *(out++) = *(in++);
-    *(out++) = *(in++);
-    *(out++) = *(in++);
-    *(out++) = *(in);
-    for (int p = 0; p < state->num_players; ++p) {
-      int p_actual = (p + state->current_player) % state->num_players;
-      *(out++) = -1;
-      *(out++) = state->scores[p_actual];
-      *(out++) = state->protesters[p_actual];
-    }
-  }
-
-  for (int p = 0; p < state->num_players; ++p) {
-    Vec2 pos = state->positions[(p + state->current_player) % state->num_players];
-    out_data[(5 * pos.y + pos.x) * num_channels + 4 + 3 * p] = 1;
-  }
+  LoggerState_getstatearray(self->state, out_data);
 
   return out_arr;
 }
@@ -523,6 +537,102 @@ static PyTypeObject PyLoggerStateType = {
 PyObject* logger_testmethod(PyObject* self, PyObject* args){
   
   Py_RETURN_NONE;
+}
+
+// ------------------------------ MCTS Object ------------------------------ //
+
+#define C_PUCT 3
+
+typedef struct MCTSNode_{
+    LoggerState state;
+    struct MCTSNode_* children[5 * 5 * 10];
+
+    double P[5 * 5 * 10];
+    double V[4];
+    int32_t N[5 * 5 * 10];
+    double W[5 * 5 * 10];
+
+    int32_t sumN;
+    double sqrt_sumN;
+
+} MCTSNode;
+
+
+/*
+    Doesn't the caller is responsible for initialising the LoggerState member
+*/
+void MCTSNode_init(MCTSNode* node) {
+    memset(node->children, 0, sizeof(node->children));
+    memset(node->N, 0, sizeof(node->N));
+    memset(node->W, 0, sizeof(node->W));
+    node->sumN = 0;
+    node->sqrt_sumN = 0;
+    printf("sizeof(node.children)=%ld", sizeof(node->children));
+}
+
+void MCTSNode_init_root(MCTSNode* node, uint8_t num_players) {
+    MCTSNode_init(node);
+    LoggerState_reset(&node->state, num_players);
+}
+
+void MCTSNode_extend_move(MCTSNode* node, int move) {
+    
+}
+
+MCTSNode* MCTSNode_search_part1(MCTSNode* root_node, int8_t* inference_array) {
+    
+    MCTSNode* node = root_node;
+    int move_idx;  
+
+    // Stochastically choose branches until a leaf node is reached
+    while (1) {
+        if (node->state.game_over) {
+            printf("TODO: gameover\n");
+            return NULL;
+        }
+
+        // Find the move maximising U
+        double maxU = -1;
+        double sqrt_sumN = node->sqrt_sumN;
+        for (size_t i = 0; i < 5*5*10; ++i) {
+            if (!node->state.legal_moves[i])
+                continue;
+            int32_t N = node->N[i];
+            double U = C_PUCT * node->P[i] * sqrt_sumN / (1 + N);
+            if (N != 0) {
+                U += node->W[i] / N;
+            }
+            if (U > maxU) {
+                move_idx = i;
+                maxU = U;
+            }
+        }
+
+        MCTSNode* next_node = node->children[move_idx];
+        if (next_node == NULL)
+            break;
+        node = next_node;
+    }
+    
+    
+    // Create the new leaf node
+    MCTSNode* new_node = malloc(sizeof(MCTSNode));
+    MCTSNode_init(new_node);
+    memcpy(&new_node->state, &node->state, sizeof(node->state));
+    Move move = {
+        .y = move_idx / (5 * 10),
+        .x = (move_idx / 10) % 5, 
+        .action = move_idx % 10, 
+        .protest_y = 0, 
+        .protest_x = 0
+    };
+    LoggerState_domove(&new_node->state, move);
+
+
+    // Copy the game state into the inference batch for the NN
+    LoggerState_getstatearray(&new_node->state, inference_array);
+
+    return new_node;
 }
 
 // ------------------------------ Module Setup ------------------------------ //
