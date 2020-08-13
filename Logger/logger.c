@@ -104,9 +104,8 @@ void LoggerState_reset(LoggerState* state, uint8_t num_players) {
   }
 
   // Place centre sapling
-  size_t pos = (2 * 5 + 2) * 4 + 0;  // Y=2, X=2, C=0
-  state->board[pos] = 1;
-  state->unoccupied[pos] = 0;
+  state->board[(2 * 5 + 2) * 4 + SAPLINGS] = 1;
+  state->unoccupied[2 * 5 + 2] = 0;
 
   _update_legal_moves(state);
 }
