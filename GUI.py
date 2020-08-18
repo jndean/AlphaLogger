@@ -4,7 +4,7 @@ import tkinter.font as font
 
 import numpy as np
 
-from logger import LoggerState
+from core import LoggerState
 
 
 class MatchGUI:
