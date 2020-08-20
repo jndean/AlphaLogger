@@ -76,5 +76,6 @@ typedef struct LoggerState_{
 void LoggerState_reset(LoggerState* state, uint8_t num_players);
 int LoggerState_domove(LoggerState* state, Move move);
 void LoggerState_getstatearray(LoggerState* state, int8_t* out_array);
+void LoggerState_setpositions(LoggerState* state, Vec2* new_positions);
 
 #endif  /* LOGGER_H */

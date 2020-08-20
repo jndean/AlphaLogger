@@ -289,3 +289,17 @@ void LoggerState_getstatearray(LoggerState* state, int8_t* out_array) {
     out_array[(5 * pos.y + pos.x) * num_channels + 4 + 3 * p] = 1;
   }
 }
+
+
+/*
+    Move the players on the board to the specified positions
+    (for setting up specific starting states)
+*/
+void LoggerState_setpositions(LoggerState* state, Vec2* new_positions) {
+  for (int i = 0; i < state->num_players; ++i) {
+    state->unoccupied[state->positions[i].y * 5 + state->positions[i].x] = 1;
+    state->unoccupied[   new_positions[i].y * 5 +    new_positions[i].x] = 0;
+    state->positions[i] = new_positions[i];
+  }
+  _update_legal_moves(state);
+}
