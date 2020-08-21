@@ -15,4 +15,4 @@ core.o: core.c
 	$(CC) $(CFLAGS) -c -o $@ $^
 
 clean:
-	rm logger.o MCTS.o core.o core.so
+	rm logger.o MCTS.o core.o

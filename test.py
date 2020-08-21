@@ -1,11 +1,14 @@
 from time import time
 
-import numpy as np
-
-import logger
+import core
 
 
-state = logger.LoggerState(2)
+core.test_method()
+
+
+quit()
+
+state = core.LoggerState(2)
 
 
 s = time()

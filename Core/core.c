@@ -6,10 +6,11 @@
 
 #include<omp.h>
 
-#include"logger.h"
+#include "logger.h"
+#include "MCTS.h"
 
 
-
+  
 // ---------------------- Python LoggerState wrapper ----------------- //
 
 typedef struct {
@@ -51,6 +52,8 @@ PyLoggerState_init(PyLoggerState *self, PyObject *args, PyObject *kwds)
       return -1;
 
   LoggerState_reset(self->state, PyLong_AsLong(num_players));
+  // Vec2 positions[2] = {{1, 1}, {3, 3}};
+  // LoggerState_setpositions(self->state, positions);
   return 0;
 }
 
@@ -181,6 +184,13 @@ static PyTypeObject PyLoggerStateType = {
 
 PyObject* core_testmethod(PyObject* self, PyObject* args){
   
+  MCTS* mcts = MCTS_new();
+  Vec2 positions[2] = {{0, 0}, {1, 1}};
+  MCTS_reset_with_positions(mcts, 2, positions);
+
+  MCTS_search_part1(mcts, 0);
+
+  MCTS_free(mcts);
   Py_RETURN_NONE;
 }
 
@@ -206,7 +216,7 @@ PyMODINIT_FUNC PyInit_core(void)
 {
   time_t t;
   srand((unsigned) time(&t));
-  
+
   import_array();
 
     PyObject *m;

@@ -1,34 +1,67 @@
 
 #include "MCTS.h"
 
+
 /*
-    Doesn't the caller is responsible for initialising the LoggerState member
+    The caller is responsible for initialising the LoggerState member
 */
-void MCTSNode_init(MCTSNode* node) {
+void MCTSNode_reset(MCTSNode* node) {
     memset(node->children, 0, sizeof(node->children));
     memset(node->N, 0, sizeof(node->N));
     memset(node->W, 0, sizeof(node->W));
     node->sumN = 0;
     node->sqrt_sumN = 0;
-    printf("sizeof(node.children)=%ld", sizeof(node->children));
 }
 
-void MCTSNode_init_root(MCTSNode* node, uint8_t num_players) {
-    MCTSNode_init(node);
-    LoggerState_reset(&node->state, num_players);
+void MCTSNode_free(MCTSNode* node) {
+    for (int i=0; i<5*5*10; ++i) {
+        if (node->children[i] != NULL) {
+            MCTSNode_free(node);
+        }
+    }
+    free(node);
 }
 
 
-MCTSNode* MCTSNode_search_part1(MCTSNode* root_node, int8_t* inference_array) {
+// -------------------------------- The MCTS container object --------------------------- //
+
+
+MCTS* MCTS_new() {
+    MCTS* mcts = malloc(sizeof(MCTS));
+    mcts->root_node = malloc(sizeof(MCTSNode));
+    return mcts;
+}
+
+void MCTS_free(MCTS* mcts) {
+    MCTSNode_free(mcts->root_node);
+    free(mcts);
+}
+
+
+void MCTS_reset(MCTS* mcts, uint8_t num_players) {
+    MCTSNode_reset(mcts->root_node);
+    LoggerState_reset(&mcts->root_node->state, num_players);
+    mcts->current_leaf_node = NULL;
+}
+
+
+void MCTS_reset_with_positions(MCTS* mcts, uint8_t num_players, Vec2* positions) {
+    MCTS_reset(mcts, num_players);
+    LoggerState_setpositions(&mcts->root_node->state, positions);
+}
+
+
+void MCTS_search_part1(MCTS* mcts, int8_t* inference_array) {
     
-    MCTSNode* node = root_node;
+    MCTSNode* node = mcts->root_node;
     int move_idx;  
 
     // Stochastically choose branches until a leaf node is reached
     while (1) {
         if (node->state.game_over) {
             printf("TODO: gameover\n");
-            return NULL;
+            mcts->current_leaf_node = NULL;
+            return;
         }
 
         // Find the move maximising U
@@ -48,6 +81,8 @@ MCTSNode* MCTSNode_search_part1(MCTSNode* root_node, int8_t* inference_array) {
             }
         }
 
+        printf("move_idx=%d\n", move_idx);
+
         MCTSNode* next_node = node->children[move_idx];
         if (next_node == NULL)
             break;
@@ -56,9 +91,9 @@ MCTSNode* MCTSNode_search_part1(MCTSNode* root_node, int8_t* inference_array) {
     
     
     // Create the new leaf node
-    MCTSNode* new_node = malloc(sizeof(MCTSNode));
-    MCTSNode_init(new_node);
-    memcpy(&new_node->state, &node->state, sizeof(node->state));
+    MCTSNode* leaf_node = malloc(sizeof(MCTSNode));
+    MCTSNode_reset(leaf_node);
+    memcpy(&leaf_node->state, &node->state, sizeof(node->state));
     Move move = {
         .y = move_idx / (5 * 10),
         .x = (move_idx / 10) % 5, 
@@ -66,11 +101,11 @@ MCTSNode* MCTSNode_search_part1(MCTSNode* root_node, int8_t* inference_array) {
         .protest_y = 0, 
         .protest_x = 0
     };
-    LoggerState_domove(&new_node->state, move);
+    LoggerState_domove(&leaf_node->state, move);
     
 
     // Copy the game state into the inference batch for the NN
-    LoggerState_getstatearray(&new_node->state, inference_array);
-
-    return new_node;
+    //LoggerState_getstatearray(&leaf_node->state, inference_array);
+    mcts->current_leaf_node = leaf_node;
+    
 }
