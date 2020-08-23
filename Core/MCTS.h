@@ -5,6 +5,7 @@
 #include<stdlib.h>
 #include<stdint.h>
 
+#include "utils.h"
 #include "logger.h"
 
 #define C_PUCT 3
@@ -12,6 +13,7 @@
 typedef struct MCTSNode_{
     LoggerState state;
     struct MCTSNode_* children[5 * 5 * 10];
+    struct MCTSNode_* parent;
 
     double P[5 * 5 * 10];
     double V[4];
@@ -34,7 +36,7 @@ MCTS* MCTS_new();
 void MCTS_reset(MCTS* mcts, uint8_t num_players);
 void MCTS_free(MCTS* mcts);
 void MCTS_reset_with_positions(MCTS* mcts, uint8_t num_players, Vec2* positions);
-void MCTS_search_part1(MCTS* mcts, int8_t* inference_array);
+void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array);
 
 
 #endif  /* MCTS_H */

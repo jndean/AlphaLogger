@@ -5,10 +5,11 @@
 /*
     The caller is responsible for initialising the LoggerState member
 */
-void MCTSNode_reset(MCTSNode* node) {
+void MCTSNode_reset(MCTSNode* node, MCTSNode* parent_node) {
     memset(node->children, 0, sizeof(node->children));
     memset(node->N, 0, sizeof(node->N));
     memset(node->W, 0, sizeof(node->W));
+    node->parent = parent_node;
     node->sumN = 0;
     node->sqrt_sumN = 0;
 }
@@ -28,18 +29,21 @@ void MCTSNode_free(MCTSNode* node) {
 
 MCTS* MCTS_new() {
     MCTS* mcts = malloc(sizeof(MCTS));
+    MALLOC_CHECK(mcts);
     mcts->root_node = malloc(sizeof(MCTSNode));
+    MALLOC_CHECK(mcts->root_node);
     return mcts;
 }
 
 void MCTS_free(MCTS* mcts) {
-    MCTSNode_free(mcts->root_node);
+    if (mcts->root_node != NULL)
+        MCTSNode_free(mcts->root_node);
     free(mcts);
 }
 
 
 void MCTS_reset(MCTS* mcts, uint8_t num_players) {
-    MCTSNode_reset(mcts->root_node);
+    MCTSNode_reset(mcts->root_node, NULL);
     LoggerState_reset(&mcts->root_node->state, num_players);
     mcts->current_leaf_node = NULL;
 }
@@ -51,7 +55,7 @@ void MCTS_reset_with_positions(MCTS* mcts, uint8_t num_players, Vec2* positions)
 }
 
 
-void MCTS_search_part1(MCTS* mcts, int8_t* inference_array) {
+void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     
     MCTSNode* node = mcts->root_node;
     int move_idx;  
@@ -92,7 +96,9 @@ void MCTS_search_part1(MCTS* mcts, int8_t* inference_array) {
     
     // Create the new leaf node
     MCTSNode* leaf_node = malloc(sizeof(MCTSNode));
-    MCTSNode_reset(leaf_node);
+    if (leaf_node == NULL) printf("Malloc failure\n");
+    node->children[move_idx] = leaf_node;
+    MCTSNode_reset(leaf_node, node);
     memcpy(&leaf_node->state, &node->state, sizeof(node->state));
     Move move = {
         .y = move_idx / (5 * 10),
@@ -102,7 +108,7 @@ void MCTS_search_part1(MCTS* mcts, int8_t* inference_array) {
         .protest_x = 0
     };
     LoggerState_domove(&leaf_node->state, move);
-    
+
 
     // Copy the game state into the inference batch for the NN
     //LoggerState_getstatearray(&leaf_node->state, inference_array);

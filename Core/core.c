@@ -6,6 +6,7 @@
 
 #include<omp.h>
 
+#include "utils.h"
 #include "logger.h"
 #include "MCTS.h"
 
@@ -182,23 +183,95 @@ static PyTypeObject PyLoggerStateType = {
 // --------------------------- Methods -------------------------- //
 
 
-PyObject* core_testmethod(PyObject* self, PyObject* args){
+PyObject* core_testMCTSsearch(PyObject* self, PyObject* args){
+
+  /*
+  PyObject* inference_method = NULL;
+  if (!PyArg_ParseTuple(args, "O", &inference_method))
+        return NULL;
+  */
   
   MCTS* mcts = MCTS_new();
   Vec2 positions[2] = {{0, 0}, {1, 1}};
   MCTS_reset_with_positions(mcts, 2, positions);
 
-  MCTS_search_part1(mcts, 0);
+  MCTS_search_forward_pass(mcts, 0);
 
   MCTS_free(mcts);
   Py_RETURN_NONE;
 }
 
+
+PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
+
+  PyObject* inference_method = NULL;
+  if (!PyArg_ParseTuple(args, "O", &inference_method))
+        return NULL;
+
+  //omp_set_num_threads(10);
+  const int num_players = 2;
+  const int batch_size = 10;
+
+  // Create numpy arrays for inference
+  npy_intp input_dims[] = {batch_size, 5, 5, 4 + 3 * num_players};
+  PyObject* input_arr = PyArray_SimpleNew(4, input_dims, NPY_INT8);
+  MALLOC_CHECK(input_arr);
+  int8_t* input_data = PyArray_GETPTR1((PyArrayObject*) input_arr, 0);
+  const int input_stride = 5 * 5 * (4 + 3 * num_players);
+
+  npy_intp output_P_dims[] = {batch_size, 5, 5};
+  PyObject* output_P_arr = PyArray_SimpleNew(3, output_P_dims, NPY_FLOAT32);
+  MALLOC_CHECK(output_P_arr);
+  float* output_P_data = PyArray_GETPTR1((PyArrayObject*) output_P_arr, 0);
+  const int P_stride = 5 * 5;
+
+  npy_intp output_V_dims[] = {batch_size, num_players};
+  PyObject* output_V_arr = PyArray_SimpleNew(2, output_V_dims, NPY_FLOAT32);
+  MALLOC_CHECK(output_V_arr);
+  float* output_V_data = PyArray_GETPTR1((PyArrayObject*) output_V_arr, 0);
+  const int V_stride = num_players;
+
+  // Set up MCTS managers
+  MCTS* mcts_array[batch_size];
+  for (int i = 0; i < batch_size; ++i) {
+    MCTS* mcts = MCTS_new();
+    MCTS_reset(mcts, num_players);
+    mcts->current_leaf_node = mcts->root_node;
+    LoggerState_getstatearray(&mcts->root_node->state, &input_data[i * input_stride]);
+    mcts_array[i] = mcts;
+  }
+
+  // Perform batched inference on the root game states
+  PyObject* inference_args = PyTuple_Pack(3, input_arr, output_P_arr, output_V_arr);
+  PyObject_CallObject(inference_method, inference_args);
+  Py_DECREF(inference_args);
+
+  // Unpack root infernces into root_nodes
+  for (int i = 0; i < batch_size; ++i) {
+    MCTSNode* node = mcts_array[i]->root_node;
+    memcpy(output_P_data[P_stride * i], node->P, sizeof(node->P));
+    memcpy(output_V_data[V_stride * i], node->V, sizeof(node->V));
+  }
+
+
+
+  //#pragma omp parallel for
+  // for (int game_num = 0; game_num < 1000000; ++game_num) {
+  // }
+
+
+  for(int i = 0; i < batch_size; ++i) {
+    MCTS_free(mcts_array[i]);
+  }
+  // Py_RETURN_NONE;
+  return output_V_arr;
+}
+
 // ------------------------------ Module Setup ------------------------------ //
 
 static PyMethodDef CoreMethods[] = {
-    {"test_method",  core_testmethod, METH_VARARGS,
-     "A test method."},
+    {"test_MCTS_search",  core_testMCTSsearch, METH_VARARGS, ""},
+    {"test_MCTS_selfplay",  core_testMCTSselfplay, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
@@ -211,7 +284,7 @@ static struct PyModuleDef coremodule = {
    CoreMethods
 };
 
-
+ 
 PyMODINIT_FUNC PyInit_core(void)
 {
   time_t t;
