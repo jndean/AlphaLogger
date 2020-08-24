@@ -12,7 +12,7 @@ core.o: core.c
 	$(CC) $(PYFLAGS) $(OMPFLAGS) $(CFLAGS) -c $^ -o $@
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $^
+	$(CC) $(PYFLAGS) $(CFLAGS) -c -o $@ $^
 
 clean:
 	rm logger.o MCTS.o core.o

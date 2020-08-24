@@ -5,6 +5,8 @@
 #include<stdlib.h>
 #include<stdint.h>
 
+#include<Python.h>
+
 #include "utils.h"
 #include "logger.h"
 
@@ -15,8 +17,8 @@ typedef struct MCTSNode_{
     struct MCTSNode_* children[5 * 5 * 10];
     struct MCTSNode_* parent;
 
-    double P[5 * 5 * 10];
-    double V[4];
+    float P[5 * 5 * 10];
+    float V[4];
     int32_t N[5 * 5 * 10];
     double W[5 * 5 * 10];
 

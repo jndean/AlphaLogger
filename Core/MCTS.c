@@ -48,7 +48,6 @@ void MCTS_reset(MCTS* mcts, uint8_t num_players) {
     mcts->current_leaf_node = NULL;
 }
 
-
 void MCTS_reset_with_positions(MCTS* mcts, uint8_t num_players, Vec2* positions) {
     MCTS_reset(mcts, num_players);
     LoggerState_setpositions(&mcts->root_node->state, positions);
@@ -115,3 +114,4 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     mcts->current_leaf_node = leaf_node;
     
 }
+

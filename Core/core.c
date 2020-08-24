@@ -211,6 +211,7 @@ PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
   //omp_set_num_threads(10);
   const int num_players = 2;
   const int batch_size = 10;
+  const int num_simulations = 1;
 
   // Create numpy arrays for inference
   npy_intp input_dims[] = {batch_size, 5, 5, 4 + 3 * num_players};
@@ -223,7 +224,7 @@ PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
   PyObject* output_P_arr = PyArray_SimpleNew(3, output_P_dims, NPY_FLOAT32);
   MALLOC_CHECK(output_P_arr);
   float* output_P_data = PyArray_GETPTR1((PyArrayObject*) output_P_arr, 0);
-  const int P_stride = 5 * 5;
+  const int P_stride = 5 * 5 * 10;
 
   npy_intp output_V_dims[] = {batch_size, num_players};
   PyObject* output_V_arr = PyArray_SimpleNew(2, output_V_dims, NPY_FLOAT32);
@@ -236,7 +237,6 @@ PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
   for (int i = 0; i < batch_size; ++i) {
     MCTS* mcts = MCTS_new();
     MCTS_reset(mcts, num_players);
-    mcts->current_leaf_node = mcts->root_node;
     LoggerState_getstatearray(&mcts->root_node->state, &input_data[i * input_stride]);
     mcts_array[i] = mcts;
   }
@@ -249,18 +249,28 @@ PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
   // Unpack root infernces into root_nodes
   for (int i = 0; i < batch_size; ++i) {
     MCTSNode* node = mcts_array[i]->root_node;
-    memcpy(output_P_data[P_stride * i], node->P, sizeof(node->P));
-    memcpy(output_V_data[V_stride * i], node->V, sizeof(node->V));
+    memcpy(node->P, &output_P_data[P_stride * i], sizeof(node->P));
+    memcpy(node->V, &output_V_data[V_stride * i], sizeof(node->V));
   }
 
 
+  // Main play loop
+  for (int move_num = 0; move_num < 1; ++move_num) {
 
-  //#pragma omp parallel for
-  // for (int game_num = 0; game_num < 1000000; ++game_num) {
-  // }
+    // Conduct num_simulations searches
+    for (int s = 0; s < num_simulations; ++s) {
+
+      // #pragma omp parallel for
+      for (int i = 0; i < batch_size; ++i) {
+        MCTS* mcts = mcts_array[i];
+        //MCTS_search_forward_pass(mcts, &input_data[input_stride * i]);
+      }
+    }
+  }
 
 
   for(int i = 0; i < batch_size; ++i) {
+    printf("%d: %p\n", i, mcts_array[i]);
     MCTS_free(mcts_array[i]);
   }
   // Py_RETURN_NONE;

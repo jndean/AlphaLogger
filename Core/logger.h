@@ -37,22 +37,6 @@ typedef struct {
 } Move;
 
 
-static Vec2 DIRECTIONS[] = {
-  {-1,  0},
-  { 0, -1},
-  { 0,  1},
-  { 1,  0},
-};
-
-static Vec2 MOTIONS[] = {
-  {-2,  0},
-  {-1, -1}, {-1,  0}, {-1,  1},
-  { 0, -2}, { 0, -1}, { 0,  0}, {0, 1}, {0, 2},
-  { 1, -1}, { 1,  0}, { 1,  1},
-  { 2,  0},
-};
-
-
 typedef struct LoggerState_{
   Vec2 positions[4];
   int8_t scores[4];
