@@ -17,7 +17,7 @@ void MCTSNode_reset(MCTSNode* node, MCTSNode* parent_node) {
 void MCTSNode_free(MCTSNode* node) {
     for (int i=0; i<5*5*10; ++i) {
         if (node->children[i] != NULL) {
-            MCTSNode_free(node);
+            MCTSNode_free(node->children[i]);
         }
     }
     free(node);
@@ -95,7 +95,7 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     
     // Create the new leaf node
     MCTSNode* leaf_node = malloc(sizeof(MCTSNode));
-    if (leaf_node == NULL) printf("Malloc failure\n");
+    MALLOC_CHECK(leaf_node);
     node->children[move_idx] = leaf_node;
     MCTSNode_reset(leaf_node, node);
     memcpy(&leaf_node->state, &node->state, sizeof(node->state));
