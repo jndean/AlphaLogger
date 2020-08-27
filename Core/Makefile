@@ -2,7 +2,7 @@ CC=gcc
 
 PYFLAGS=-I/usr/include/python3.8/ -I/home/josef/AlphaLogger/venv/lib/python3.8/site-packages/numpy/core/include/
 OMPFLAGS=-lgomp -fopenmp
-CFLAGS=-fPIC -Wall -Wno-unused-function
+CFLAGS=-fPIC -Wall -Wno-unused-function -O3
 
 
 default: logger.o MCTS.o core.o

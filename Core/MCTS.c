@@ -57,7 +57,7 @@ void MCTS_reset_with_positions(MCTS* mcts, uint8_t num_players, Vec2* positions)
 void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     
     MCTSNode* node = mcts->root_node;
-    int move_idx;  
+    int move_idx;
 
     // Stochastically choose branches until a leaf node is reached
     while (1) {
@@ -84,7 +84,7 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
             }
         }
 
-        printf("move_idx=%d\n", move_idx);
+        printf("%p: move_idx=%d\n", node, move_idx);
 
         MCTSNode* next_node = node->children[move_idx];
         if (next_node == NULL)
@@ -92,6 +92,7 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
         node = next_node;
     }
     
+    printf("\n");
     
     // Create the new leaf node
     MCTSNode* leaf_node = malloc(sizeof(MCTSNode));
@@ -110,7 +111,7 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
 
 
     // Copy the game state into the inference batch for the NN
-    //LoggerState_getstatearray(&leaf_node->state, inference_array);
+    LoggerState_getstatearray(&leaf_node->state, inference_array);
     mcts->current_leaf_node = leaf_node;
     
 }

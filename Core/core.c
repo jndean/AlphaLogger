@@ -121,9 +121,9 @@ static PyObject*
 PyLoggerState_test(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
 {
 
-  omp_set_num_threads(10);
+  omp_set_num_threads(8);
   #pragma omp parallel for
-  for (int game_num = 0; game_num < 1000000; ++game_num) {
+  for (int game_num = 0; game_num < 10000000; ++game_num) {
     LoggerState* state = malloc(sizeof(LoggerState));
     LoggerState_reset(state, self->state->num_players);
     for (int move_num = 0; move_num < 25; ++move_num) {
@@ -210,7 +210,7 @@ PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
 
   //omp_set_num_threads(10);
   const int num_players = 2;
-  const int batch_size = 10;
+  const int batch_size = 2;
   const int num_simulations = 1;
 
   // Create numpy arrays for inference
@@ -220,8 +220,8 @@ PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
   int8_t* input_data = PyArray_GETPTR1((PyArrayObject*) input_arr, 0);
   const int input_stride = 5 * 5 * (4 + 3 * num_players);
 
-  npy_intp output_P_dims[] = {batch_size, 5, 5};
-  PyObject* output_P_arr = PyArray_SimpleNew(3, output_P_dims, NPY_FLOAT32);
+  npy_intp output_P_dims[] = {batch_size, 5, 5, 10};
+  PyObject* output_P_arr = PyArray_SimpleNew(4, output_P_dims, NPY_FLOAT32);
   MALLOC_CHECK(output_P_arr);
   float* output_P_data = PyArray_GETPTR1((PyArrayObject*) output_P_arr, 0);
   const int P_stride = 5 * 5 * 10;
@@ -244,9 +244,6 @@ PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
   // Perform batched inference on the root game states
   PyObject* inference_args = PyTuple_Pack(3, input_arr, output_P_arr, output_V_arr);
   PyObject_CallObject(inference_method, inference_args);
-  Py_DECREF(inference_args);
-
-  // Unpack root infernces into root_nodes
   for (int i = 0; i < batch_size; ++i) {
     MCTSNode* node = mcts_array[i]->root_node;
     memcpy(node->P, &output_P_data[P_stride * i], sizeof(node->P));
@@ -262,19 +259,37 @@ PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
 
       // #pragma omp parallel for
       for (int i = 0; i < batch_size; ++i) {
-        MCTS* mcts = mcts_array[i];
-        //MCTS_search_forward_pass(mcts, &input_data[input_stride * i]);
+        MCTS_search_forward_pass(mcts_array[i], &input_data[input_stride * i]);
       }
+
+      // Perform batched inference on the leaf game states
+      PyObject_CallObject(inference_method, inference_args);
+
+      // Unpack infernces into leaf nodes
+      for (int i = 0; i < batch_size; ++i) {
+        MCTSNode* node = mcts_array[i]->current_leaf_node;
+        memcpy(node->P, &output_P_data[P_stride * i], sizeof(node->P));
+        memcpy(node->V, &output_V_data[V_stride * i], sizeof(node->V));
+      }
+
+      // #pragma omp parallel for
+      for (int i = 0; i < batch_size; ++i) {
+        // MCTS_search_backward_pass(mcts_array[i]);
+      }
+
     }
   }
 
 
+  // Py_DECREF(input_arr);
+  // Py_DECREF(output_P_arr);
+  // Py_DECREF(output_V_arr);
+  Py_DECREF(inference_args);
   for(int i = 0; i < batch_size; ++i) {
-    printf("%d: %p\n", i, mcts_array[i]);
     MCTS_free(mcts_array[i]);
   }
   // Py_RETURN_NONE;
-  return output_V_arr;
+  return input_arr;
 }
 
 // ------------------------------ Module Setup ------------------------------ //
