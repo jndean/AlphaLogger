@@ -48,11 +48,7 @@ PyLoggerState_dealloc(PyLoggerState *self)
 static int
 PyLoggerState_init(PyLoggerState *self, PyObject *args, PyObject *kwds)
 {
-  PyObject *num_players = NULL;
-    if(!PyArg_ParseTuple(args, "O", &num_players))
-      return -1;
-
-  LoggerState_reset(self->state, PyLong_AsLong(num_players));
+  LoggerState_reset(self->state);
   // Vec2 positions[2] = {{1, 1}, {3, 3}};
   // LoggerState_setpositions(self->state, positions);
   return 0;
@@ -62,7 +58,7 @@ PyLoggerState_init(PyLoggerState *self, PyObject *args, PyObject *kwds)
 static PyObject*
 PyLoggerState_getstatearray(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
 {
-  const int num_channels = 4 + 3 * self->state->num_players;
+  const int num_channels = 4 + 3 * NUM_PLAYERS;
   npy_intp dims[] = {5, 5, num_channels};
   PyObject *out_arr = PyArray_SimpleNew(3, dims, NPY_INT8);
   if (out_arr == NULL) 
@@ -89,9 +85,9 @@ static PyObject*
 PyLoggerState_getplayerpositions(PyLoggerState *self, PyObject *Py_UNUSED(ignored))
 {
   LoggerState* state = self->state;
-  PyObject* ret = PyTuple_New(state->num_players);
-  for (int i = 0; i < state->num_players; ++i) {
-    int p = (state->current_player + i) % state->num_players;
+  PyObject* ret = PyTuple_New(NUM_PLAYERS);
+  for (int i = 0; i < NUM_PLAYERS; ++i) {
+    int p = (state->current_player + i) % NUM_PLAYERS;
     Vec2 coords = state->positions[p];
     PyObject* py_coords = Py_BuildValue("(ii)", coords.y, coords.x);
     PyTuple_SetItem(ret, i, py_coords);
@@ -125,9 +121,9 @@ PyLoggerState_test(PyLoggerState *self, PyObject *Py_UNUSED(ignored))
   #pragma omp parallel for
   for (int game_num = 0; game_num < 10000000; ++game_num) {
     LoggerState* state = malloc(sizeof(LoggerState));
-    LoggerState_reset(state, self->state->num_players);
+    LoggerState_reset(state);
     for (int move_num = 0; move_num < 25; ++move_num) {
-        int move_idx;
+        int move_idx = -1;
         for (int i = 0; i < sizeof(state->legal_moves); ++i) {
             if (state->legal_moves[i] && i % 10 != 8) {
                 move_idx = i;
@@ -193,7 +189,7 @@ PyObject* core_testMCTSsearch(PyObject* self, PyObject* args){
   
   MCTS* mcts = MCTS_new();
   Vec2 positions[2] = {{0, 0}, {1, 1}};
-  MCTS_reset_with_positions(mcts, 2, positions);
+  MCTS_reset_with_positions(mcts, positions);
 
   MCTS_search_forward_pass(mcts, 0);
 
@@ -209,16 +205,15 @@ PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
         return NULL;
 
   //omp_set_num_threads(10);
-  const int num_players = 2;
   const int batch_size = 2;
   const int num_simulations = 1;
 
   // Create numpy arrays for inference
-  npy_intp input_dims[] = {batch_size, 5, 5, 4 + 3 * num_players};
+  npy_intp input_dims[] = {batch_size, 5, 5, 4 + 3 * NUM_PLAYERS};
   PyObject* input_arr = PyArray_SimpleNew(4, input_dims, NPY_INT8);
   MALLOC_CHECK(input_arr);
   int8_t* input_data = PyArray_GETPTR1((PyArrayObject*) input_arr, 0);
-  const int input_stride = 5 * 5 * (4 + 3 * num_players);
+  const int input_stride = 5 * 5 * (4 + 3 * NUM_PLAYERS);
 
   npy_intp output_P_dims[] = {batch_size, 5, 5, 10};
   PyObject* output_P_arr = PyArray_SimpleNew(4, output_P_dims, NPY_FLOAT32);
@@ -226,17 +221,17 @@ PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
   float* output_P_data = PyArray_GETPTR1((PyArrayObject*) output_P_arr, 0);
   const int P_stride = 5 * 5 * 10;
 
-  npy_intp output_V_dims[] = {batch_size, num_players};
+  npy_intp output_V_dims[] = {batch_size, NUM_PLAYERS};
   PyObject* output_V_arr = PyArray_SimpleNew(2, output_V_dims, NPY_FLOAT32);
   MALLOC_CHECK(output_V_arr);
   float* output_V_data = PyArray_GETPTR1((PyArrayObject*) output_V_arr, 0);
-  const int V_stride = num_players;
+  const int V_stride = NUM_PLAYERS;
 
   // Set up MCTS managers
   MCTS* mcts_array[batch_size];
   for (int i = 0; i < batch_size; ++i) {
     MCTS* mcts = MCTS_new();
-    MCTS_reset(mcts, num_players);
+    MCTS_reset(mcts);
     LoggerState_getstatearray(&mcts->root_node->state, &input_data[i * input_stride]);
     mcts_array[i] = mcts;
   }
@@ -265,16 +260,13 @@ PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
       // Perform batched inference on the leaf game states
       PyObject_CallObject(inference_method, inference_args);
 
-      // Unpack infernces into leaf nodes
+      // Unpack infernces into leaf nodes and backpropogate scores
       for (int i = 0; i < batch_size; ++i) {
+        MCTS* mcts = mcts_array[i];
         MCTSNode* node = mcts_array[i]->current_leaf_node;
         memcpy(node->P, &output_P_data[P_stride * i], sizeof(node->P));
         memcpy(node->V, &output_V_data[V_stride * i], sizeof(node->V));
-      }
-
-      // #pragma omp parallel for
-      for (int i = 0; i < batch_size; ++i) {
-        // MCTS_search_backward_pass(mcts_array[i]);
+        MCTS_search_backward_pass(mcts);
       }
 
     }

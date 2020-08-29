@@ -8,6 +8,8 @@
 #include<string.h>
 
 
+#define NUM_PLAYERS 2
+
 /*
 LoggerState array format:
 0: saplings               (1 / -1)
@@ -38,18 +40,17 @@ typedef struct {
 
 
 typedef struct LoggerState_{
-  Vec2 positions[4];
-  int8_t scores[4];
-  int8_t protesters[4];
+  Vec2 positions[NUM_PLAYERS];
+  int8_t scores[NUM_PLAYERS];
+  int8_t protesters[NUM_PLAYERS];
 
   int8_t board[5 * 5 * 4];
   int8_t unoccupied[5 * 5];
   int8_t legal_moves[5 * 5 * 10];
 
-  uint8_t num_players;
   uint8_t num_unprotested_trees;
   uint8_t current_player;
-  uint8_t game_over;
+  int8_t game_winner;
 
 } LoggerState;
 
@@ -57,7 +58,7 @@ typedef struct LoggerState_{
 #define ON_BOARD(px, py) ((px >=0) && (px < 5) && (py >= 0) && (py < 5))
 
 
-void LoggerState_reset(LoggerState* state, uint8_t num_players);
+void LoggerState_reset(LoggerState* state);
 int LoggerState_domove(LoggerState* state, Move move);
 void LoggerState_getstatearray(LoggerState* state, int8_t* out_array);
 void LoggerState_setpositions(LoggerState* state, Vec2* new_positions);

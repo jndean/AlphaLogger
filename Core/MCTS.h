@@ -18,12 +18,12 @@ typedef struct MCTSNode_{
     struct MCTSNode_* parent;
 
     float P[5 * 5 * 10];
-    float V[4];
+    float V[NUM_PLAYERS];
     int32_t N[5 * 5 * 10];
-    double W[5 * 5 * 10];
+    float W[5 * 5 * 10];
 
     int32_t sumN;
-    double sqrt_sumN;
+    float sqrt_sumN;
 
 } MCTSNode;
 
@@ -35,10 +35,11 @@ typedef struct MCTS_{
 
 
 MCTS* MCTS_new();
-void MCTS_reset(MCTS* mcts, uint8_t num_players);
+void MCTS_reset(MCTS* mcts);
 void MCTS_free(MCTS* mcts);
-void MCTS_reset_with_positions(MCTS* mcts, uint8_t num_players, Vec2* positions);
+void MCTS_reset_with_positions(MCTS* mcts, Vec2* positions);
 void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array);
+void MCTS_search_backward_pass(MCTS* mcts);
 
 
 #endif  /* MCTS_H */

@@ -29,7 +29,7 @@ static void _update_legal_moves(LoggerState* state);
 /* 
   Set the game state to a new game with random player positions
 */
-void LoggerState_reset(LoggerState* state, uint8_t num_players) {
+void LoggerState_reset(LoggerState* state) {
 
   // Fill with empty markers
   memset(state->scores,      0, sizeof(state->scores));
@@ -37,15 +37,14 @@ void LoggerState_reset(LoggerState* state, uint8_t num_players) {
   memset(state->board,      -1, sizeof(state->board));
   memset(state->unoccupied,  1, sizeof(state->unoccupied));
 
-  state->num_players = num_players;
   state->num_unprotested_trees = 0;
   state->current_player = 0;
-  state->game_over = 0;
+  state->game_winner = -1;
 
   // Place players
   int corner;
   int8_t taken_corners[4] = {0, 0, 0, 0};
-  for (int p = 0; p < num_players; ++p) {
+  for (int p = 0; p < NUM_PLAYERS; ++p) {
     do {corner = rand() & 3;} while(taken_corners[corner]);
     taken_corners[corner] = 1;
     int8_t x = (corner & 1) << 2;
@@ -88,15 +87,15 @@ int LoggerState_domove(LoggerState* state, Move move) {
   // Action 9 is a pass that does nothing
 
   // Check for winner
-  for (int p = 0; p < state->num_players; ++p) {
+  for (int p = 0; p < NUM_PLAYERS; ++p) {
     if (state->scores[p] >= 10) {
-      state->game_over = 1;
+      state->game_winner = p;
       return p;
     }
   }
 
   // Move to next turn
-  state->current_player = (state->current_player + 1) % state->num_players;
+  state->current_player = (state->current_player + 1) % NUM_PLAYERS;
   _update_legal_moves(state);
 
   return -1;  // No winner
@@ -282,7 +281,7 @@ static void _update_legal_moves(LoggerState* state) {
 */ 
 void LoggerState_getstatearray(LoggerState* state, int8_t* out_array) {
 
-  const int num_channels = 4 + 3 * state->num_players;
+  const int num_channels = 4 + 3 * NUM_PLAYERS;
 
   for(int xy = 0; xy < 25; ++xy) {
     int8_t* in = state->board + xy * 4;
@@ -291,16 +290,16 @@ void LoggerState_getstatearray(LoggerState* state, int8_t* out_array) {
     *(out++) = *(in++);
     *(out++) = *(in++);
     *(out++) = *(in);
-    for (int p = 0; p < state->num_players; ++p) {
-      int p_actual = (p + state->current_player) % state->num_players;
+    for (int p = 0; p < NUM_PLAYERS; ++p) {
+      int p_actual = (p + state->current_player) % NUM_PLAYERS;
       *(out++) = -1;
       *(out++) = state->scores[p_actual];
       *(out++) = state->protesters[p_actual];
     }
   }
 
-  for (int p = 0; p < state->num_players; ++p) {
-    Vec2 pos = state->positions[(p + state->current_player) % state->num_players];
+  for (int p = 0; p < NUM_PLAYERS; ++p) {
+    Vec2 pos = state->positions[(p + state->current_player) % NUM_PLAYERS];
     out_array[(5 * pos.y + pos.x) * num_channels + 4 + 3 * p] = 1;
   }
 }
@@ -311,7 +310,7 @@ void LoggerState_getstatearray(LoggerState* state, int8_t* out_array) {
     (for setting up specific starting states)
 */
 void LoggerState_setpositions(LoggerState* state, Vec2* new_positions) {
-  for (int i = 0; i < state->num_players; ++i) {
+  for (int i = 0; i < NUM_PLAYERS; ++i) {
     state->unoccupied[state->positions[i].y * 5 + state->positions[i].x] = 1;
     state->unoccupied[   new_positions[i].y * 5 +    new_positions[i].x] = 0;
     state->positions[i] = new_positions[i];

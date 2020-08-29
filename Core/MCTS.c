@@ -42,14 +42,14 @@ void MCTS_free(MCTS* mcts) {
 }
 
 
-void MCTS_reset(MCTS* mcts, uint8_t num_players) {
+void MCTS_reset(MCTS* mcts) {
     MCTSNode_reset(mcts->root_node, NULL);
-    LoggerState_reset(&mcts->root_node->state, num_players);
+    LoggerState_reset(&mcts->root_node->state);
     mcts->current_leaf_node = NULL;
 }
 
-void MCTS_reset_with_positions(MCTS* mcts, uint8_t num_players, Vec2* positions) {
-    MCTS_reset(mcts, num_players);
+void MCTS_reset_with_positions(MCTS* mcts, Vec2* positions) {
+    MCTS_reset(mcts);
     LoggerState_setpositions(&mcts->root_node->state, positions);
 }
 
@@ -57,11 +57,11 @@ void MCTS_reset_with_positions(MCTS* mcts, uint8_t num_players, Vec2* positions)
 void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     
     MCTSNode* node = mcts->root_node;
-    int move_idx;
+    int move_idx = -1;
 
     // Stochastically choose branches until a leaf node is reached
     while (1) {
-        if (node->state.game_over) {
+        if (node->state.game_winner != -1) {
             printf("TODO: gameover\n");
             mcts->current_leaf_node = NULL;
             return;
@@ -116,3 +116,19 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     
 }
 
+void MCTS_search_backward_pass(MCTS* mcts) {
+
+    MCTSNode* node = mcts->current_leaf_node;
+    float V[4];
+    memcpy(V, node->V, sizeof(node->V));
+    // const int num_players_minus_1 = node->state.num_players - 1;
+
+    // while (node->parent != NULL) {
+    //     MCTSNode* parent = node->parent;
+
+    //     for (int i = 0; i < )
+
+    //     node = parent;
+    // }
+
+}
