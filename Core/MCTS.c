@@ -11,7 +11,6 @@ void MCTSNode_reset(MCTSNode* node, MCTSNode* parent_node) {
     memset(node->W, 0, sizeof(node->W));
     node->parent = parent_node;
     node->sumN = 0;
-    node->sqrt_sumN = 0;
 }
 
 void MCTSNode_free(MCTSNode* node) {
@@ -68,13 +67,13 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
         }
 
         // Find the move maximising U
-        double maxU = -1;
-        double sqrt_sumN = node->sqrt_sumN;
+        float maxU = -1;
+        float sqrt_sumN = sqrt((float)node->sumN);
         for (size_t i = 0; i < 5*5*10; ++i) {
             if (!node->state.legal_moves[i])
                 continue;
             int32_t N = node->N[i];
-            double U = C_PUCT * node->P[i] * sqrt_sumN / (1 + N);
+            float U = C_PUCT * node->P[i] * sqrt_sumN / (1 + N);
             if (N != 0) {
                 U += node->W[i] / N;
             }
@@ -84,15 +83,17 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
             }
         }
 
-        printf("%p: move_idx=%d\n", node, move_idx);
+        printf("fwd %p: move_idx=%d\n", node, move_idx);
 
+        // Record what move was made for backpropogation later
+        node->current_move_idx = move_idx;
+
+        // Move down the branch
         MCTSNode* next_node = node->children[move_idx];
         if (next_node == NULL)
             break;
         node = next_node;
     }
-    
-    printf("\n");
     
     // Create the new leaf node
     MCTSNode* leaf_node = malloc(sizeof(MCTSNode));
@@ -116,19 +117,46 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     
 }
 
+
+void MCTSNode_unpack_inference(MCTSNode* node, float* P, float* V) {
+    memcpy(node->P, P, sizeof(node->P));
+    // The infered V always has the current player first, (so the NN understands the current player)
+    // whereas the MCTSNode stores things with player 0 first. Convert during the copy.
+    const int current_player = node->state.current_player;
+    for (int i = 0; i < NUM_PLAYERS; ++i) {
+        node->V[(i + current_player) % NUM_PLAYERS] = V[i];
+    }
+}
+
+
 void MCTS_search_backward_pass(MCTS* mcts) {
 
+    float* V = mcts->current_leaf_node->V;
     MCTSNode* node = mcts->current_leaf_node;
-    float V[4];
-    memcpy(V, node->V, sizeof(node->V));
-    // const int num_players_minus_1 = node->state.num_players - 1;
 
-    // while (node->parent != NULL) {
-    //     MCTSNode* parent = node->parent;
+    while (NULL != (node = node->parent)) {
+        int move_idx = node->current_move_idx;
+        int current_player = node->state.current_player;
 
-    //     for (int i = 0; i < )
+        node->W[move_idx] = V[current_player];
+        node->N[move_idx]++;
+        node->sumN++;
 
-    //     node = parent;
-    // }
+        printf("bkwd %p\n", node);
+    }
 
+}
+
+
+int MCTS_choose_move_greedy(MCTS* mcts) {
+    uint32_t* N = mcts->root_node->N;
+    int argmax = 0;
+    uint32_t max = 0;
+    for (int i = 1; i < 5 * 5 * 10; ++i) {
+        if (N[i] > max) {
+            max = N[i];
+            argmax = i;
+        }
+    }
+    return argmax;
 }
