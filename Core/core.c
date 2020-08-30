@@ -41,7 +41,8 @@ PyLoggerState_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static void
 PyLoggerState_dealloc(PyLoggerState *self)
 {
-    Py_TYPE(self)->tp_free((PyObject *) self);
+  if (self->state != NULL) free(self->state);
+  Py_TYPE(self)->tp_free((PyObject *) self);
 }
 
 
