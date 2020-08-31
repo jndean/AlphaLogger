@@ -5,7 +5,7 @@
 /*
     The caller is responsible for initialising the LoggerState member
 */
-void MCTSNode_reset(MCTSNode* node, MCTSNode* parent_node) {
+void MCTSNode_init(MCTSNode* node, MCTSNode* parent_node) {
     memset(node->children, 0, sizeof(node->children));
     memset(node->N, 0, sizeof(node->N));
     memset(node->W, 0, sizeof(node->W));
@@ -41,15 +41,16 @@ void MCTS_free(MCTS* mcts) {
 }
 
 
-void MCTS_reset(MCTS* mcts) {
-    MCTSNode_reset(mcts->root_node, NULL);
+void MCTS_init(MCTS* mcts) {
+    MCTSNode_init(mcts->root_node, NULL);
     LoggerState_reset(&mcts->root_node->state);
     mcts->current_leaf_node = NULL;
 }
 
-void MCTS_reset_with_positions(MCTS* mcts, Vec2* positions) {
-    MCTS_reset(mcts);
-    LoggerState_setpositions(&mcts->root_node->state, positions);
+
+void MCTS_init_with_state(MCTS* mcts, LoggerState* state) {
+    MCTS_init(mcts);
+    memcpy(&mcts->root_node->state, state, sizeof(LoggerState));
 }
 
 
@@ -99,7 +100,7 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     MCTSNode* leaf_node = malloc(sizeof(MCTSNode));
     MALLOC_CHECK(leaf_node);
     node->children[move_idx] = leaf_node;
-    MCTSNode_reset(leaf_node, node);
+    MCTSNode_init(leaf_node, node);
     memcpy(&leaf_node->state, &node->state, sizeof(node->state));
     Move move = {
         .y = move_idx / (5 * 10),

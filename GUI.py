@@ -151,7 +151,7 @@ class MatchGUI:
             else:
                 move = current_player.choose_move(self.board)
 
-            message = "Legal move"  # f'"{current_player.id}" plays {Game.stringify_move(move, self.num_players)}'
+            message = "Legal move"  # f'"{current_player.name}" plays {Game.stringify_move(move, self.num_players)}'
             self.print(message)
 
             final_scores = self.game_state.do_move(*move)
@@ -162,7 +162,7 @@ class MatchGUI:
             if final_scores is not None:
                 self.draw()
                 winner = self.players[np.argmax(final_scores)]
-                self.print(f"{winner.id} wins!")
+                self.print(f"{winner.name} wins!")
                 self.game_over = True
                 return
             """
@@ -206,7 +206,7 @@ class MatchGUI:
                 else:
                     for i, player in enumerate(self.players):
                         if board[y, x, 4 + 3 * i] == 1:
-                            label = f"{player.id}\n{board[y, x, 5 + 3 * i]} ({board[y, x, 6 + 3 * i]})"
+                            label = f"{player.name}\n{board[y, x, 5 + 3 * i]} ({board[y, x, 6 + 3 * i]})"
                             break
                     else:
                         label = ""
@@ -217,14 +217,29 @@ class MatchGUI:
 
 
 class Player:
-    def __init__(self, ID):
-        self.id = ID
+    def __init__(self, name="No name"):
+        self.name=name
 
     def done_move(self, move):
         pass
 
+    def sync_with_game(self, game):
+        pass
+
+
 class Human(Player):
     pass
+
+
+class RandomMCTS(Player):
+
+    def __init__(self, num_simulations=400, **kwargs):
+        super().__init__(**kwargs)
+        self.num_simulations = num_simulations
+        self.mcts = core.MCTS
+
+    def sync_with_game(self, game):
+        self.mcts.sync_with_game(game)
 
 
 if __name__ == '__main__':
@@ -233,7 +248,7 @@ if __name__ == '__main__':
 
     match = MatchGUI(
         players=[
-            Human('Human'),
-            Human("NotHuman"),
+            Human(name='Human'),
+            Human(name="2ndHuman"),
         ]
     )

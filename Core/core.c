@@ -177,23 +177,126 @@ static PyTypeObject PyLoggerStateType = {
 };
 
 
-// --------------------------- Methods -------------------------- //
+// --------------------------- PyMCTS object -------------------------- //
+
+typedef struct {
+    PyObject_HEAD
+    MCTS* mcts;
+} PyMCTS;
 
 
-PyObject* core_testMCTSsearch(PyObject* self, PyObject* args){
-  
-  MCTS* mcts = MCTS_new();
-  Vec2 positions[2] = {{0, 0}, {1, 1}};
-  MCTS_reset_with_positions(mcts, positions);
+static PyObject *
+PyMCTS_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
 
-  MCTS_search_forward_pass(mcts, 0);
+    PyMCTS *self;
+    self = (PyMCTS *) type->tp_alloc(type, 0);
+    if (self == NULL) return NULL;
 
-  MCTS_free(mcts);
+    self->mcts = MCTS_new();
+    if (self->mcts == NULL) {
+      Py_DECREF(self);
+      return NULL;
+    }
+
+    return (PyObject *) self;
+}
+
+
+static void
+PyMCTS_dealloc(PyMCTS *self)
+{
+    if (self->mcts != NULL)  MCTS_free(self->mcts);
+    Py_TYPE(self)->tp_free((PyObject *) self);
+}
+
+
+static int
+PyMCTS_init(PyMCTS *self, PyObject *args, PyObject *kwds)
+{
+  MCTS_init(self->mcts);
+  return 0;
+}
+
+
+static PyObject*
+PyMCTS_sync_with_game(PyMCTS *self, PyObject *args)
+{
+  PyObject* game_state = NULL;
+  if (!PyArg_ParseTuple(args, "O", &game_state))
+    return NULL;
+  if (Py_TYPE(game_state) != &PyLoggerStateType) {
+    PyErr_SetString(PyExc_ValueError, "MCTS.sync_with_game requires LoggerState instance as an argument");
+    return NULL;
+  }
+
+  MCTS_free(self->mcts);
+  self->mcts = MCTS_new();
+  MALLOC_CHECK(self->mcts);
+  MCTS_init_with_state(self->mcts, ((PyLoggerState*)(game_state))->state);
+
   Py_RETURN_NONE;
 }
 
 
-PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
+static PyObject*
+PyMCTS_test(PyMCTS *self, PyObject *Py_UNUSED(ignored))
+{
+  Vec2* positions = self->mcts->root_node->state.positions;
+  for (int i = 0; i < NUM_PLAYERS; ++i) {
+    printf("(%d, %d)\n", positions[i].y, positions[i].x);
+  }
+
+  Py_RETURN_NONE;
+}
+
+static PyMethodDef PyMCTS_methods[] = {
+    // {"get_state_array", (PyCFunction) PyMCTS_getstatearray, METH_NOARGS,
+    //  "Get the board state as a numpy array"},
+    // {"get_legal_moves_array", (PyCFunction) PyMCTS_getlegalmovesarray, METH_NOARGS,
+    //  "Get the legal move mask"},
+    // {"get_player_positions", (PyCFunction) PyMCTS_getplayerpositions, METH_NOARGS,
+    //  "Get the positions of the player, a tuple of tuples (y, x)"},
+    {"sync_with_game", (PyCFunction) PyMCTS_sync_with_game, METH_VARARGS,
+     "Initialise the root node with the given starting state"},
+    {"test", (PyCFunction) PyMCTS_test, METH_NOARGS,
+     "Testing method"},
+    {NULL}  /* Sentinel */
+};
+
+static PyTypeObject PyMCTSType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "core.MCTS",
+    .tp_doc = "An object managing a Monte Carlo Tree Search",
+    .tp_basicsize = sizeof(PyMCTS),
+    .tp_itemsize = 0,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_new = PyMCTS_new,
+    .tp_dealloc = (destructor) PyMCTS_dealloc,
+    .tp_init = (initproc) PyMCTS_init,
+    .tp_methods = PyMCTS_methods,
+};
+
+
+// --------------------------- Methods -------------------------- //
+
+
+static PyObject*
+core_testMCTSsearch(PyObject* self, PyObject* args){
+  
+  // MCTS* mcts = MCTS_new();
+  // Vec2 positions[2] = {{0, 0}, {1, 1}};
+  // MCTS_reset_with_positions(mcts, positions);
+
+  // MCTS_search_forward_pass(mcts, 0);
+
+  // MCTS_free(mcts);
+  Py_RETURN_NONE;
+}
+
+
+static PyObject*
+core_testMCTSselfplay(PyObject* self, PyObject* args){
 
   PyObject* inference_method = NULL;
   if (!PyArg_ParseTuple(args, "O", &inference_method))
@@ -217,7 +320,7 @@ PyObject* core_testMCTSselfplay(PyObject* self, PyObject* args){
   MCTS* mcts_array[batch_size];
   for (int i = 0; i < batch_size; ++i) {
     MCTS* mcts = MCTS_new();
-    MCTS_reset(mcts);
+    MCTS_init(mcts);
     LoggerState_getstatearray(&mcts->root_node->state, &input_data[i * input_stride]);
     mcts_array[i] = mcts;
   }
@@ -299,6 +402,8 @@ PyMODINIT_FUNC PyInit_core(void)
     PyObject *m;
     if (PyType_Ready(&PyLoggerStateType) < 0)
         return NULL;
+    if (PyType_Ready(&PyMCTSType) < 0)
+        return NULL;
 
     m = PyModule_Create(&coremodule);
     if (m == NULL)
@@ -307,6 +412,13 @@ PyMODINIT_FUNC PyInit_core(void)
     Py_INCREF(&PyLoggerStateType);
     if (PyModule_AddObject(m, "LoggerState", (PyObject *) &PyLoggerStateType) < 0) {
         Py_DECREF(&PyLoggerStateType);
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    Py_INCREF(&PyMCTSType);
+    if (PyModule_AddObject(m, "MCTS", (PyObject *) &PyMCTSType) < 0) {
+        Py_DECREF(&PyMCTSType);
         Py_DECREF(m);
         return NULL;
     }

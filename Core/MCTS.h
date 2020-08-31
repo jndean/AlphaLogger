@@ -36,10 +36,10 @@ typedef struct MCTS_{
 
 
 MCTS* MCTS_new();
-void MCTS_reset(MCTS* mcts);
+void MCTS_init(MCTS* mcts);
 void MCTS_free(MCTS* mcts);
 void MCTSNode_unpack_inference(MCTSNode* node, float* P, float* V);
-void MCTS_reset_with_positions(MCTS* mcts, Vec2* positions);
+void MCTS_init_with_state(MCTS* mcts, LoggerState* state);
 void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array);
 void MCTS_search_backward_pass(MCTS* mcts);
 int MCTS_choose_move_greedy(MCTS* mcts);
