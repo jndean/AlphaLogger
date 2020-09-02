@@ -42,7 +42,8 @@ void MCTSNode_unpack_inference(MCTSNode* node, float* P, float* V);
 void MCTS_init_with_state(MCTS* mcts, LoggerState* state);
 void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array);
 void MCTS_search_backward_pass(MCTS* mcts);
-int MCTS_choose_move_greedy(MCTS* mcts);
+int MCTS_choose_move(MCTS* mcts, int exploratory);
+void MCTS_do_move(MCTS* mcts);
 
 
 #endif  /* MCTS_H */

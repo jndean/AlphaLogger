@@ -10,6 +10,7 @@ mcts = core.MCTS()
 game_state = core.LoggerState()
 mcts.sync_with_game(game_state)
 
+print(mcts.choose_move(exploratory=True))
 
 
 # def inference(inputs):

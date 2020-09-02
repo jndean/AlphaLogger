@@ -149,15 +149,44 @@ void MCTS_search_backward_pass(MCTS* mcts) {
 }
 
 
-int MCTS_choose_move_greedy(MCTS* mcts) {
+int _choose_move_greedy(MCTS* mcts) {
     uint32_t* N = mcts->root_node->N;
-    int argmax = 0;
+    int8_t* legal_moves = mcts->root_node->state.legal_moves;
+    int argmax = -1;
     uint32_t max = 0;
-    for (int i = 1; i < 5 * 5 * 10; ++i) {
-        if (N[i] > max) {
+    for (int i = 0; i < 5 * 5 * 10; ++i) {
+        if (legal_moves[i] && N[i] > max) {
             max = N[i];
             argmax = i;
         }
     }
     return argmax;
+}
+
+
+int _choose_move_exploratory(MCTS* mcts) {
+    uint32_t* N = mcts->root_node->N;
+    int8_t* legal_moves = mcts->root_node->state.legal_moves;
+
+    uint8_t sumN = mcts->root_node->sumN;
+    if (sumN == 0) return -1;
+    uint32_t choice = ((uint32_t) rand()) % sumN;
+
+    uint32_t partial_sum = 0;
+    int i;
+    for (i = 0; i < 5 * 5 * 10; ++i) {
+        if (legal_moves[i]) {
+            partial_sum += N[i];
+            if (partial_sum > choice)
+                break;
+        } 
+    }
+    return i;
+}
+
+
+int MCTS_choose_move(MCTS* mcts, int exploratory) {
+    if (exploratory) 
+        return _choose_move_exploratory(mcts);
+    return _choose_move_greedy(mcts);
 }

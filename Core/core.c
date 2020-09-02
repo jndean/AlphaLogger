@@ -100,7 +100,7 @@ PyLoggerState_getplayerpositions(PyLoggerState *self, PyObject *Py_UNUSED(ignore
 static PyObject*
 PyLoggerState_domove(PyLoggerState *self, PyObject* args, PyObject* keywds)
 {
-  static char* kwlist[] = {"y", "x", "action", "protest_y", "protest_x"};
+  static char* kwlist[] = {"y", "x", "action", "protest_y", "protest_x", NULL};
   unsigned char y, x, action, protest_y=0, protest_x=0;
 
   if (!PyArg_ParseTupleAndKeywords(args, keywds, "bbb|bb", kwlist,
@@ -240,6 +240,22 @@ PyMCTS_sync_with_game(PyMCTS *self, PyObject *args)
 
 
 static PyObject*
+PyMCTS_choose_move(PyMCTS *self, PyObject *args, PyObject *kwargs)
+{
+  static char* kwlist[] = {"exploratory", NULL};
+  int exploratory = 0;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|p", kwlist, &exploratory))
+    return NULL;
+
+  int move = MCTS_choose_move(self->mcts, exploratory);
+  if (move == -1) {
+    Py_RETURN_NONE;
+  }
+  return PyLong_FromLong((long)move);
+}
+
+
+static PyObject*
 PyMCTS_test(PyMCTS *self, PyObject *Py_UNUSED(ignored))
 {
   Vec2* positions = self->mcts->root_node->state.positions;
@@ -255,8 +271,8 @@ static PyMethodDef PyMCTS_methods[] = {
     //  "Get the board state as a numpy array"},
     // {"get_legal_moves_array", (PyCFunction) PyMCTS_getlegalmovesarray, METH_NOARGS,
     //  "Get the legal move mask"},
-    // {"get_player_positions", (PyCFunction) PyMCTS_getplayerpositions, METH_NOARGS,
-    //  "Get the positions of the player, a tuple of tuples (y, x)"},
+    {"choose_move", (PyCFunction) PyMCTS_choose_move, METH_VARARGS | METH_KEYWORDS,
+     "Assuming MCTS simulations have been run, pick a move to do"},
     {"sync_with_game", (PyCFunction) PyMCTS_sync_with_game, METH_VARARGS,
      "Initialise the root node with the given starting state"},
     {"test", (PyCFunction) PyMCTS_test, METH_NOARGS,

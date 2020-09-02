@@ -149,7 +149,7 @@ class MatchGUI:
                     print('Legal move:', self.game_state.get_legal_moves_array()[move_y, move_x])
 
             else:
-                move = current_player.choose_move(self.board)
+                move = current_player.choose_move(self.game_state)
 
             message = "Legal move"  # f'"{current_player.name}" plays {Game.stringify_move(move, self.num_players)}'
             self.print(message)
@@ -212,13 +212,15 @@ class MatchGUI:
                         label = ""
                 self.grid[y][x]['text'] = label
 
-    def compute_motion(self, motion_idx):
-        motions = (())
-
 
 class Player:
+    move_indices = np.arange(5*5*10)
+
     def __init__(self, name="No name"):
         self.name=name
+
+    def choose_move(self, game):
+        raise NotImplementedError()
 
     def done_move(self, move):
         pass
@@ -231,6 +233,27 @@ class Human(Player):
     pass
 
 
+def move_idx_to_tuple(idx):
+    y = idx // 50
+    x = (idx // 10) % 5
+    action = idx % 10
+    return (y, x, action, 0, 0)
+
+
+def uniform_probs_from_game(game):
+    legal_moves = game.get_legal_moves_array().flatten()
+    probs = legal_moves / np.sum(legal_moves)
+
+
+class Random(Player):
+    def choose_move(self, game):
+        move_idx = np.random.choice(
+            Player.move_indices, 
+            p=uniform_probs_from_game(game)
+        )
+        return move_idx_to_tuple(move_idx)
+
+
 class RandomMCTS(Player):
 
     def __init__(self, num_simulations=400, **kwargs):
@@ -241,6 +264,10 @@ class RandomMCTS(Player):
     def sync_with_game(self, game):
         self.mcts.sync_with_game(game)
 
+    def choose_move(self, game):
+        move_idx = self.mcts.choose_move()
+        return move_idx_to_tuple(move_idx)
+
 
 if __name__ == '__main__':
 
@@ -249,6 +276,7 @@ if __name__ == '__main__':
     match = MatchGUI(
         players=[
             Human(name='Human'),
-            Human(name="2ndHuman"),
+            # Human(name="2ndHuman"),
+            Random(name="Random"),
         ]
     )
