@@ -43,7 +43,7 @@ void MCTS_init_with_state(MCTS* mcts, LoggerState* state);
 void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array);
 void MCTS_search_backward_pass(MCTS* mcts);
 int MCTS_choose_move(MCTS* mcts, int exploratory);
-void MCTS_do_move(MCTS* mcts);
+void MCTS_do_move(MCTS* mcts, int move_idx);
 
 
 #endif  /* MCTS_H */

@@ -190,3 +190,12 @@ int MCTS_choose_move(MCTS* mcts, int exploratory) {
         return _choose_move_exploratory(mcts);
     return _choose_move_greedy(mcts);
 }
+
+
+void MCTS_do_move(MCTS* mcts, int move_idx) {
+    if (mcts->root_node == NULL) return;
+    MCTSNode* new_root = mcts->root_node->children[move_idx];
+    mcts->root_node->children[move_idx] = NULL;
+    MCTSNode_free(mcts->root_node);
+    mcts->root_node = new_root;
+}

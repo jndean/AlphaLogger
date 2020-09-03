@@ -256,6 +256,24 @@ PyMCTS_choose_move(PyMCTS *self, PyObject *args, PyObject *kwargs)
 
 
 static PyObject*
+PyMCTS_do_move(PyMCTS *self, PyObject *args)
+{
+  int move_idx = -1;
+  if (!PyArg_ParseTuple(args, "i", &move_idx))
+    return NULL;
+
+  if (move_idx < 0 || move_idx >= 5 * 5 * 10) {
+    PyErr_SetString(PyExc_ValueError, "Invalid move_idx given to MCTS.done_move");
+    return NULL;
+  }
+
+  MCTS_do_move(self->mcts, move_idx);
+
+  Py_RETURN_NONE;
+}
+
+
+static PyObject*
 PyMCTS_test(PyMCTS *self, PyObject *Py_UNUSED(ignored))
 {
   Vec2* positions = self->mcts->root_node->state.positions;
@@ -269,10 +287,10 @@ PyMCTS_test(PyMCTS *self, PyObject *Py_UNUSED(ignored))
 static PyMethodDef PyMCTS_methods[] = {
     // {"get_state_array", (PyCFunction) PyMCTS_getstatearray, METH_NOARGS,
     //  "Get the board state as a numpy array"},
-    // {"get_legal_moves_array", (PyCFunction) PyMCTS_getlegalmovesarray, METH_NOARGS,
-    //  "Get the legal move mask"},
     {"choose_move", (PyCFunction) PyMCTS_choose_move, METH_VARARGS | METH_KEYWORDS,
      "Assuming MCTS simulations have been run, pick a move to do"},
+    {"done_move", (PyCFunction) PyMCTS_do_move, METH_VARARGS,
+     "Tell the MCTS to update internal state due to a move being done"},
     {"sync_with_game", (PyCFunction) PyMCTS_sync_with_game, METH_VARARGS,
      "Initialise the root node with the given starting state"},
     {"test", (PyCFunction) PyMCTS_test, METH_NOARGS,

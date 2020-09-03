@@ -268,6 +268,9 @@ class RandomMCTS(Player):
         move_idx = self.mcts.choose_move()
         return move_idx_to_tuple(move_idx)
 
+    def done_move(self, move_idx):
+        self.mcts.done_move(move_idx)
+
 
 if __name__ == '__main__':
 
