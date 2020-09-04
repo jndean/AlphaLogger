@@ -23,6 +23,36 @@ void MCTSNode_free(MCTSNode* node) {
 }
 
 
+void MCTSNode_unpack_inference(MCTSNode* node, float* P, float* V) {
+    memcpy(node->P, P, sizeof(node->P));
+    // The infered V always has the current player first, (so the NN understands the current player)
+    // whereas the MCTSNode stores things with player 0 first. Convert during the copy.
+    const int current_player = node->state.current_player;
+    for (int i = 0; i < NUM_PLAYERS; ++i) {
+        node->V[(i + current_player) % NUM_PLAYERS] = V[i];
+    }
+}
+
+
+MCTSNode* MCTSNode_create_child(MCTSNode* node, int move_idx) {
+    MCTSNode* child_node = malloc(sizeof(MCTSNode));
+    MALLOC_CHECK(child_node);
+    node->children[move_idx] = child_node;
+    MCTSNode_init(child_node, node);
+
+    memcpy(&child_node->state, &node->state, sizeof(node->state));
+    Move move = {
+        .y = move_idx / (5 * 10),
+        .x = (move_idx / 10) % 5, 
+        .action = move_idx % 10, 
+        .protest_y = 0, 
+        .protest_x = 0
+    };
+    LoggerState_domove(&child_node->state, move);
+
+    return child_node;
+}
+
 // -------------------------------- The MCTS container object --------------------------- //
 
 
@@ -97,36 +127,11 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     }
     
     // Create the new leaf node
-    MCTSNode* leaf_node = malloc(sizeof(MCTSNode));
-    MALLOC_CHECK(leaf_node);
-    node->children[move_idx] = leaf_node;
-    MCTSNode_init(leaf_node, node);
-    memcpy(&leaf_node->state, &node->state, sizeof(node->state));
-    Move move = {
-        .y = move_idx / (5 * 10),
-        .x = (move_idx / 10) % 5, 
-        .action = move_idx % 10, 
-        .protest_y = 0, 
-        .protest_x = 0
-    };
-    LoggerState_domove(&leaf_node->state, move);
-
+    MCTSNode* leaf_node = MCTSNode_create_child(node, move_idx);
+    mcts->current_leaf_node = leaf_node;
 
     // Copy the game state into the inference batch for the NN
-    LoggerState_getstatearray(&leaf_node->state, inference_array);
-    mcts->current_leaf_node = leaf_node;
-    
-}
-
-
-void MCTSNode_unpack_inference(MCTSNode* node, float* P, float* V) {
-    memcpy(node->P, P, sizeof(node->P));
-    // The infered V always has the current player first, (so the NN understands the current player)
-    // whereas the MCTSNode stores things with player 0 first. Convert during the copy.
-    const int current_player = node->state.current_player;
-    for (int i = 0; i < NUM_PLAYERS; ++i) {
-        node->V[(i + current_player) % NUM_PLAYERS] = V[i];
-    }
+    LoggerState_getstatearray(&leaf_node->state, inference_array);   
 }
 
 
@@ -185,17 +190,24 @@ int _choose_move_exploratory(MCTS* mcts) {
 }
 
 
-int MCTS_choose_move(MCTS* mcts, int exploratory) {
+int MCTS_choose_move(MCTS* mcts, PyObject* inferer, int num_simulations, int exploratory) {
     if (exploratory) 
         return _choose_move_exploratory(mcts);
     return _choose_move_greedy(mcts);
 }
 
 
-void MCTS_do_move(MCTS* mcts, int move_idx) {
-    if (mcts->root_node == NULL) return;
-    MCTSNode* new_root = mcts->root_node->children[move_idx];
-    mcts->root_node->children[move_idx] = NULL;
-    MCTSNode_free(mcts->root_node);
-    mcts->root_node = new_root;
+void MCTS_do_move(MCTS* mcts, int move_idx)
+{
+    MCTSNode* old_root = mcts->root_node;
+
+    // Make the corresponding child node the new root node
+    // Create a node if no such child exists
+    mcts->root_node = old_root->children[move_idx];
+    if (mcts->root_node == NULL) 
+        mcts->root_node = MCTSNode_create_child(old_root, move_idx);
+    mcts->root_node->parent = NULL;
+
+    old_root->children[move_idx] = NULL;
+    MCTSNode_free(old_root);
 }

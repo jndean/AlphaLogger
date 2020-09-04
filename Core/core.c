@@ -242,12 +242,16 @@ PyMCTS_sync_with_game(PyMCTS *self, PyObject *args)
 static PyObject*
 PyMCTS_choose_move(PyMCTS *self, PyObject *args, PyObject *kwargs)
 {
-  static char* kwlist[] = {"exploratory", NULL};
-  int exploratory = 0;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|p", kwlist, &exploratory))
-    return NULL;
+  static char* kwlist[] = {"inferer", "num_simulations", "exploratory", NULL};
+  PyObject* inferer = NULL;
+  int num_simulations = 0, exploratory = 0;
 
-  int move = MCTS_choose_move(self->mcts, exploratory);
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oi|p", kwlist, 
+            &inferer, &num_simulations, &exploratory)) {
+    return NULL;
+  }
+
+  int move = MCTS_choose_move(self->mcts, inferer, num_simulations, exploratory);
   if (move == -1) {
     Py_RETURN_NONE;
   }

@@ -30,6 +30,7 @@ typedef struct MCTSNode_{
 
 
 typedef struct MCTS_{
+    // PyObject* inference_method;
 	MCTSNode* root_node;
 	MCTSNode* current_leaf_node;
 } MCTS;
@@ -42,7 +43,7 @@ void MCTSNode_unpack_inference(MCTSNode* node, float* P, float* V);
 void MCTS_init_with_state(MCTS* mcts, LoggerState* state);
 void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array);
 void MCTS_search_backward_pass(MCTS* mcts);
-int MCTS_choose_move(MCTS* mcts, int exploratory);
+int MCTS_choose_move(MCTS* mcts, PyObject* inferer, int num_simulations, int exploratory);
 void MCTS_do_move(MCTS* mcts, int move_idx);
 
 
