@@ -56,22 +56,25 @@ MCTSNode* MCTSNode_create_child(MCTSNode* node, int move_idx) {
 // -------------------------------- The MCTS container object --------------------------- //
 
 
-MCTS* MCTS_new() {
+MCTS* MCTS_new(PyObject* inference_method) {
     MCTS* mcts = malloc(sizeof(MCTS));
     MALLOC_CHECK(mcts);
     mcts->root_node = malloc(sizeof(MCTSNode));
     MALLOC_CHECK(mcts->root_node);
+    mcts->inference_method = inference_method;
+    Py_INCREF(inference_method);
     return mcts;
 }
 
 void MCTS_free(MCTS* mcts) {
-    if (mcts->root_node != NULL)
-        MCTSNode_free(mcts->root_node);
+    MCTSNode_free(mcts->root_node);
+    Py_DECREF(mcts->inference_method);
     free(mcts);
 }
 
 
 void MCTS_init(MCTS* mcts) {
+    printf("TODO: root node still has no P and V calculated\n");
     MCTSNode_init(mcts->root_node, NULL);
     LoggerState_reset(&mcts->root_node->state);
     mcts->current_leaf_node = NULL;
@@ -81,6 +84,15 @@ void MCTS_init(MCTS* mcts) {
 void MCTS_init_with_state(MCTS* mcts, LoggerState* state) {
     MCTS_init(mcts);
     memcpy(&mcts->root_node->state, state, sizeof(LoggerState));
+}
+
+
+void MCTS_sync_with_game(MCTS* mcts, LoggerState* state) {
+    for (int i = 0; i < 5 * 5 * 10; ++i) {
+        if (mcts->root_node->children[i] != NULL)
+            MCTSNode_free(mcts->root_node->children[i]);
+    }
+    MCTS_init_with_state(mcts, state);
 }
 
 
@@ -190,7 +202,34 @@ int _choose_move_exploratory(MCTS* mcts) {
 }
 
 
-int MCTS_choose_move(MCTS* mcts, PyObject* inferer, int num_simulations, int exploratory) {
+int MCTS_choose_move(MCTS* mcts, int num_simulations, int exploratory) {
+
+    // Create numpy arrays for inference
+    static npy_intp input_dims[] = {1, 5, 5, 4 + 3 * NUM_PLAYERS};
+    PyObject* input_arr = PyArray_SimpleNew(4, input_dims, NPY_INT8);
+    MALLOC_CHECK(input_arr);
+    int8_t* input_data = PyArray_GETPTR1((PyArrayObject*) input_arr, 0);
+    PyObject* inference_args = PyTuple_Pack(1, input_arr);
+
+    for (int i = 0; i < num_simulations; ++i) {
+        // Do a forward pass, creating a leaf node and putting it's state in input_data
+        MCTS_search_forward_pass(mcts, input_data);
+
+        // Perform inference to compute the P and V for the leaf node
+        PyObject* P_and_V = PyObject_CallObject(mcts->inference_method, inference_args);
+        float* P = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 0), 0);
+        float* V = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 1), 0);
+        MCTSNode_unpack_inference(mcts->root_node, P, V);
+        Py_DECREF(P_and_V);
+
+        // Backward pass, propagating the visit counts and V values back up the tree
+       MCTS_search_backward_pass(mcts);
+    }
+
+    Py_DECREF(input_arr);
+    Py_DECREF(inference_args);
+
+    // Choose a move (child node) based on visit counts
     if (exploratory) 
         return _choose_move_exploratory(mcts);
     return _choose_move_greedy(mcts);

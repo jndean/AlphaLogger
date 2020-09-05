@@ -245,6 +245,12 @@ def uniform_probs_from_game(game):
     probs = legal_moves / np.sum(legal_moves)
 
 
+def uniform_inference(game_array):
+    P = np.ones(shape=(inputs.shape[0], 5, 5, 10), dtype=np.float32) * (1/250)
+    V = inputs[:, 0, 0, 5::3].astype(np.float32)
+    return P.copy(order='C'), V.copy(order='C')
+
+
 class Random(Player):
     def choose_move(self, game):
         move_idx = np.random.choice(
@@ -256,16 +262,21 @@ class Random(Player):
 
 class RandomMCTS(Player):
 
-    def __init__(self, num_simulations=400, **kwargs):
+    def __init__(self, num_simulations=400, exploratory=False, **kwargs):
         super().__init__(**kwargs)
         self.num_simulations = num_simulations
-        self.mcts = core.MCTS
+        self.exploratory = exploratory
+        self.mcts = core.MCTS()
 
     def sync_with_game(self, game):
         self.mcts.sync_with_game(game)
 
     def choose_move(self, game):
-        move_idx = self.mcts.choose_move()
+        move_idx = self.mcts.choose_move(
+            inferer=uniform_inference, 
+            num_simulations=self.num_simulations,
+            exploratory=self.exploratory
+        )
         return move_idx_to_tuple(move_idx)
 
     def done_move(self, move_idx):

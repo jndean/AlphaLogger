@@ -1,5 +1,6 @@
 #define PY_SSIZE_T_CLEAN
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#define PY_ARRAY_UNIQUE_SYMBOL ALPHALOGGER_PY_ARRAY_UNIQUE_SYMBOL
 
 #include<Python.h>
 #include <numpy/arrayobject.h>
@@ -186,14 +187,19 @@ typedef struct {
 
 
 static PyObject *
-PyMCTS_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+PyMCTS_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 {
+
+    static char* kwlist[] = {"inference_method", NULL};
+    PyObject* inference_method = NULL;
+   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &inference_method))
+      return NULL;
 
     PyMCTS *self;
     self = (PyMCTS *) type->tp_alloc(type, 0);
     if (self == NULL) return NULL;
 
-    self->mcts = MCTS_new();
+    self->mcts = MCTS_new(inference_method);
     if (self->mcts == NULL) {
       Py_DECREF(self);
       return NULL;
@@ -230,10 +236,7 @@ PyMCTS_sync_with_game(PyMCTS *self, PyObject *args)
     return NULL;
   }
 
-  MCTS_free(self->mcts);
-  self->mcts = MCTS_new();
-  MALLOC_CHECK(self->mcts);
-  MCTS_init_with_state(self->mcts, ((PyLoggerState*)(game_state))->state);
+  MCTS_sync_with_game(self->mcts, ((PyLoggerState*)(game_state))->state);
 
   Py_RETURN_NONE;
 }
@@ -242,16 +245,15 @@ PyMCTS_sync_with_game(PyMCTS *self, PyObject *args)
 static PyObject*
 PyMCTS_choose_move(PyMCTS *self, PyObject *args, PyObject *kwargs)
 {
-  static char* kwlist[] = {"inferer", "num_simulations", "exploratory", NULL};
-  PyObject* inferer = NULL;
+  static char* kwlist[] = {"num_simulations", "exploratory", NULL};
   int num_simulations = 0, exploratory = 0;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oi|p", kwlist, 
-            &inferer, &num_simulations, &exploratory)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "i|p", kwlist, 
+            &num_simulations, &exploratory)) {
     return NULL;
   }
 
-  int move = MCTS_choose_move(self->mcts, inferer, num_simulations, exploratory);
+  int move = MCTS_choose_move(self->mcts, num_simulations, exploratory);
   if (move == -1) {
     Py_RETURN_NONE;
   }
@@ -334,7 +336,8 @@ core_testMCTSsearch(PyObject* self, PyObject* args){
 
 
 static PyObject*
-core_testMCTSselfplay(PyObject* self, PyObject* args){
+core_testMCTSselfplay(PyObject* self, PyObject* args)
+{
 
   PyObject* inference_method = NULL;
   if (!PyArg_ParseTuple(args, "O", &inference_method))
@@ -357,21 +360,21 @@ core_testMCTSselfplay(PyObject* self, PyObject* args){
   // Set up MCTS managers
   MCTS* mcts_array[batch_size];
   for (int i = 0; i < batch_size; ++i) {
-    MCTS* mcts = MCTS_new();
+    MCTS* mcts = MCTS_new(inference_method);
     MCTS_init(mcts);
     LoggerState_getstatearray(&mcts->root_node->state, &input_data[i * input_stride]);
     mcts_array[i] = mcts;
   }
 
-  // Perform batched inference on the root game states
-  PyObject* inference_args = PyTuple_Pack(1, input_arr);
-  PyObject* P_and_V = PyObject_CallObject(inference_method, inference_args);
-  float* P = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 0), 0);
-  float* V = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 1), 0);
-  for (int i = 0; i < batch_size; ++i) {
-    MCTSNode_unpack_inference(mcts_array[i]->root_node, &P[i * P_stride], &V[i * V_stride]);
-  }
-  Py_DECREF(P_and_V);
+    // Perform batched inference on the root game states
+    PyObject* inference_args = PyTuple_Pack(1, input_arr);
+    PyObject* P_and_V = PyObject_CallObject(inference_method, inference_args);
+    float* P = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 0), 0);
+    float* V = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 1), 0);
+    for (int i = 0; i < batch_size; ++i) {
+      MCTSNode_unpack_inference(mcts_array[i]->root_node, &P[i * P_stride], &V[i * V_stride]);
+    }
+    Py_DECREF(P_and_V);
 
   // Main play loop
   for (int move_num = 0; move_num < 1; ++move_num) {
@@ -432,10 +435,10 @@ static struct PyModuleDef coremodule = {
  
 PyMODINIT_FUNC PyInit_core(void)
 {
-  time_t t;
-  srand((unsigned) time(&t));
+    time_t t;
+    srand((unsigned) time(&t));
 
-  import_array();
+    import_array();
 
     PyObject *m;
     if (PyType_Ready(&PyLoggerStateType) < 0)
