@@ -220,7 +220,7 @@ PyMCTS_dealloc(PyMCTS *self)
 static int
 PyMCTS_init(PyMCTS *self, PyObject *args, PyObject *kwds)
 {
-  MCTS_init(self->mcts);
+  MCTS_init(self->mcts, NULL);
   return 0;
 }
 
@@ -361,7 +361,7 @@ core_testMCTSselfplay(PyObject* self, PyObject* args)
   MCTS* mcts_array[batch_size];
   for (int i = 0; i < batch_size; ++i) {
     MCTS* mcts = MCTS_new(inference_method);
-    MCTS_init(mcts);
+    MCTS_init(mcts, NULL);
     LoggerState_getstatearray(&mcts->root_node->state, &input_data[i * input_stride]);
     mcts_array[i] = mcts;
   }

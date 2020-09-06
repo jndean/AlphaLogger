@@ -44,8 +44,7 @@ typedef struct MCTS_{
 
 MCTS* MCTS_new(PyObject* inference_method);
 void MCTS_free(MCTS* mcts);
-void MCTS_init(MCTS* mcts);
-void MCTS_init_with_state(MCTS* mcts, LoggerState* state);
+void MCTS_init(MCTS* mcts, LoggerState* state);
 void MCTS_sync_with_game(MCTS* mcts, LoggerState* state);
 void MCTSNode_unpack_inference(MCTSNode* node, float* P, float* V);
 void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array);
