@@ -4,7 +4,9 @@ import tkinter.font as font
 
 import numpy as np
 
-from core import LoggerState
+import utilities
+from player import HumanPlayer, RandomPlayer
+import core
 
 
 class MatchGUI:
@@ -13,9 +15,9 @@ class MatchGUI:
         self.players = deque(players)
         self.num_players = len(players)
 
-        self.game_state = LoggerState(self.num_players)
+        self.game_state = core.LoggerState()
         while (self.game_state.get_player_positions()[0] != (0, 0)):
-            self.game_state = LoggerState(self.num_players)
+            self.game_state = core.LoggerState()
 
         self.num_actions = 10
 
@@ -121,7 +123,7 @@ class MatchGUI:
     def continue_game(self):
         while not self.game_over:
             current_player = self.players[0]
-            if isinstance(current_player, Human):
+            if isinstance(current_player, HumanPlayer):
                 if None in [self.chosen_motion, self.chosen_action]:
                     return
                 player_y, player_x = self.game_state.get_player_positions()[0]
@@ -138,18 +140,16 @@ class MatchGUI:
                 move = (move_y, move_x, move_action, protest_y, protest_x)
 
                 self.chosen_motion, self.chosen_action, self.chosen_protester = None, None, None
-                print('Checking move:', self.game_state.get_legal_moves_array()[move_y, move_x])
-                if not (0 <= move_y < 5 
-                        and 0 <= move_x < 5
-                        and self.game_state.get_legal_moves_array()[move_y, move_x, move_action]
-                        and self._check_protest(move)):
-                    self.print(f"Illegal move [({move_y}, {move_x}), {move_action}, ({protest_y}, {protest_x})]")
-                    return
-                else:
-                    print('Legal move:', self.game_state.get_legal_moves_array()[move_y, move_x])
-
             else:
                 move = current_player.choose_move(self.game_state)
+                move_y, move_x, move_action, _, _ = move
+
+            if not (0 <= move_y < 5 
+                    and 0 <= move_x < 5
+                    and self.game_state.get_legal_moves_array()[move_y, move_x, move_action]
+                    and self._check_protest(move)):
+                self.print(f"Illegal move [{utilities.stringify_move(move)}] by {current_player.name}")
+                return
 
             message = "Legal move"  # f'"{current_player.name}" plays {Game.stringify_move(move, self.num_players)}'
             self.print(message)
@@ -213,84 +213,14 @@ class MatchGUI:
                 self.grid[y][x]['text'] = label
 
 
-class Player:
-    move_indices = np.arange(5*5*10)
-
-    def __init__(self, name="No name"):
-        self.name=name
-
-    def choose_move(self, game):
-        raise NotImplementedError()
-
-    def done_move(self, move):
-        pass
-
-    def sync_with_game(self, game):
-        pass
-
-
-class Human(Player):
-    pass
-
-
-def move_idx_to_tuple(idx):
-    y = idx // 50
-    x = (idx // 10) % 5
-    action = idx % 10
-    return (y, x, action, 0, 0)
-
-
-def uniform_probs_from_game(game):
-    legal_moves = game.get_legal_moves_array().flatten()
-    probs = legal_moves / np.sum(legal_moves)
-
-
-def uniform_inference(game_array):
-    P = np.ones(shape=(inputs.shape[0], 5, 5, 10), dtype=np.float32) * (1/250)
-    V = inputs[:, 0, 0, 5::3].astype(np.float32)
-    return P.copy(order='C'), V.copy(order='C')
-
-
-class Random(Player):
-    def choose_move(self, game):
-        move_idx = np.random.choice(
-            Player.move_indices, 
-            p=uniform_probs_from_game(game)
-        )
-        return move_idx_to_tuple(move_idx)
-
-
-class RandomMCTS(Player):
-
-    def __init__(self, num_simulations=400, exploratory=False, **kwargs):
-        super().__init__(**kwargs)
-        self.num_simulations = num_simulations
-        self.exploratory = exploratory
-        self.mcts = core.MCTS()
-
-    def sync_with_game(self, game):
-        self.mcts.sync_with_game(game)
-
-    def choose_move(self, game):
-        move_idx = self.mcts.choose_move(
-            inferer=uniform_inference, 
-            num_simulations=self.num_simulations,
-            exploratory=self.exploratory
-        )
-        return move_idx_to_tuple(move_idx)
-
-    def done_move(self, move_idx):
-        self.mcts.done_move(move_idx)
-
-
 if __name__ == '__main__':
 
     num_players = 2
 
     match = MatchGUI(
         players=[
-            Human(name='Human'),
-            # Human(name="2ndHuman"),
-            Random(name="Random"),
+            HumanPlayer(name='Human'),
+            # player.Human(name="2ndHuman"),
+            RandomPlayer(name="Random"),
         ]
     )

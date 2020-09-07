@@ -64,6 +64,7 @@ MCTSNode* MCTSNode_create_child(MCTSNode* node, int move_idx) {
 void MCTSNode_init_as_root(MCTSNode* node, LoggerState* state, PyObject* inference_method) {
     MCTSNode_init(node, NULL, state);
 
+
     npy_intp input_dims[] = {1, 5, 5, 4 + 3 * NUM_PLAYERS};
     PyObject* input_arr = PyArray_SimpleNew(4, input_dims, NPY_INT8);
     MALLOC_CHECK(input_arr);

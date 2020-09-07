@@ -109,9 +109,13 @@ PyLoggerState_domove(PyLoggerState *self, PyObject* args, PyObject* keywds)
     return NULL;
 
   Move move = {y, x, action, protest_y, protest_x};
-  LoggerState_domove(self->state, move);
-
-  Py_RETURN_NONE;
+  int winner = LoggerState_domove(self->state, move);
+  
+  if (winner == -1) {
+    Py_RETURN_NONE;
+  } else {
+    return PyLong_FromLong(winner);
+  }
 }
 
 
