@@ -124,7 +124,11 @@ void MCTS_sync_with_game(MCTS* mcts, LoggerState* state) {
 }
 
 
-void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
+/*
+    Returns a boolean indicating if NN inference is required. E.g. infernce is not 
+    required if the leaf node is a game-over state, since it's value is predefined
+*/
+int MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     
     MCTSNode* node = mcts->root_node;
     int move_idx = -1;
@@ -132,9 +136,9 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     // Stochastically choose branches until a leaf node is reached
     while (1) {
         if (node->state.game_winner != -1) {
-            printf("TODO: gameover\n");
-            mcts->current_leaf_node = NULL;
-            return;
+            // printf("TODO: gameover\n");
+            mcts->current_leaf_node = node;
+            return 0;
         }
 
         // Find the move maximising U
@@ -154,8 +158,6 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
             }
         }
 
-        // printf("fwd %p: move_idx=%d\n", node, move_idx);
-
         // Record what move was made for backpropogation later
         node->current_move_idx = move_idx;
 
@@ -170,8 +172,17 @@ void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     MCTSNode* leaf_node = MCTSNode_create_child(node, move_idx);
     mcts->current_leaf_node = leaf_node;
 
+    // No inference required if there's a winner
+    if (leaf_node->state.game_winner != -1) {
+        for (int i = 0; i < NUM_PLAYERS; ++i)
+            leaf_node->V[i] = -1;
+        leaf_node->V[leaf_node->state.game_winner] = 1;    
+        return 0;
+    }
+
     // Copy the game state into the inference batch for the NN
-    LoggerState_getstatearray(&leaf_node->state, inference_array);   
+    LoggerState_getstatearray(&leaf_node->state, inference_array);
+    return 1;
 }
 
 
@@ -241,14 +252,16 @@ int MCTS_choose_move(MCTS* mcts, int num_simulations, int exploratory) {
 
     for (int i = 0; i < num_simulations; ++i) {
         // Do a forward pass, creating a leaf node and putting it's state in input_data
-        MCTS_search_forward_pass(mcts, input_data);
+        int inference_required = MCTS_search_forward_pass(mcts, input_data);
 
-        // Perform inference to compute the P and V for the leaf node
-        PyObject* P_and_V = PyObject_CallObject(mcts->inference_method, inference_args);
-        float* P = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 0), 0);
-        float* V = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 1), 0);
-        MCTSNode_unpack_inference(mcts->current_leaf_node, P, V);
-        Py_DECREF(P_and_V);
+        if (inference_required) {
+            // Perform inference to compute the P and V for the leaf node
+            PyObject* P_and_V = PyObject_CallObject(mcts->inference_method, inference_args);
+            float* P = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 0), 0);
+            float* V = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 1), 0);
+            MCTSNode_unpack_inference(mcts->current_leaf_node, P, V);
+            Py_DECREF(P_and_V);
+        }
 
         // Backward pass, propagating the visit counts and V values back up the tree
          MCTS_search_backward_pass(mcts);

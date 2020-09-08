@@ -17,7 +17,7 @@
 #include "utils.h"
 #include "logger.h"
 
-#define C_PUCT 3
+#define C_PUCT 4
 
 typedef struct MCTSNode_{
     LoggerState state;
@@ -47,7 +47,7 @@ void MCTS_free(MCTS* mcts);
 void MCTS_init(MCTS* mcts, LoggerState* state);
 void MCTS_sync_with_game(MCTS* mcts, LoggerState* state);
 void MCTSNode_unpack_inference(MCTSNode* node, float* P, float* V);
-void MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array);
+int MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array);
 void MCTS_search_backward_pass(MCTS* mcts);
 int MCTS_choose_move(MCTS* mcts, int num_simulations, int exploratory);
 void MCTS_do_move(MCTS* mcts, int move_idx);

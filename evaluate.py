@@ -26,10 +26,10 @@ def play_matches(players, num_matches=1, max_turns=100):
 
 if __name__ == '__main__':
     players = [
+        player.RandomMCTSPlayer(name="R2", num_simulations=500),
         player.RandomPlayer(name="R1"),
-        player.RandomPlayer(name="R2"),
     ]
-    num_matches = 1000
+    num_matches = 100
     max_turns = 50
 
     scores = play_matches(players, num_matches, max_turns)

@@ -4,8 +4,8 @@ import tkinter.font as font
 
 import numpy as np
 
-import utilities
-from player import HumanPlayer, RandomPlayer
+from utilities import stringify_move
+from player import HumanPlayer, RandomPlayer, RandomMCTSPlayer
 import core
 
 
@@ -148,10 +148,10 @@ class MatchGUI:
                     and 0 <= move_x < 5
                     and self.game_state.get_legal_moves_array()[move_y, move_x, move_action]
                     and self._check_protest(move)):
-                self.print(f"Illegal move [{utilities.stringify_move(move)}] by {current_player.name}")
+                self.print(f"Illegal move [{stringify_move(move)}] by {current_player.name}")
                 return
 
-            message = "Legal move"  # f'"{current_player.name}" plays {Game.stringify_move(move, self.num_players)}'
+            message = f'"{current_player.name}" plays {stringify_move(move)}'
             self.print(message)
 
             final_scores = self.game_state.do_move(*move)
@@ -221,6 +221,7 @@ if __name__ == '__main__':
         players=[
             HumanPlayer(name='Human'),
             # player.Human(name="2ndHuman"),
-            RandomPlayer(name="Random"),
+            RandomMCTSPlayer(name="R2", num_simulations=500),
+            # RandomPlayer(name="Random"),
         ]
     )
