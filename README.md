@@ -21,8 +21,11 @@ Highspeed version Tasks:
 
 - [x] An efficient and thread-safe C implementation of Logger 
 
-  Now getting over 20 million moves per second on a mobile i5 CPU! (Whilst doing nothing else, just playing 8 parallel games on loop)
+- [x] An efficient and thread-safe C implementation of the MCTS
+- [ ] A fully parallelised self-play and training pipeline supporting batching inference over simultaneous games [ IN PROGRESS ]
 
-- [ ] An efficient and thread-safe C implementation of the MCTS [ IN PROGRESS ]
 
-- [ ] A fully parallelised self-play and training pipeline [ IN PROGRESS ]
+
+The C implementation of Logger can handle 20 million moves per second using 8 threads on a mobile i5-8250U.
+
+The C implementation of the Monte Carlo Tree Search can do 840,000 simulations per second using 8 threads on a mobile i5-8250U. One simulation is one forward pass through the tree, the creation of a leaf node and dummy inference on that node's state, and one backward pass propagating information back to the root node.

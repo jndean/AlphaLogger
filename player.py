@@ -30,10 +30,11 @@ def uniform_probs_from_game(game):
     return probs
 
 
+tmp_P = np.ones(shape=(1, 5, 5, 10), dtype=np.float32) * (1/250)
 def uniform_inference(game_array):
-    P = np.ones(shape=(game_array.shape[0], 5, 5, 10), dtype=np.float32) * (1/250)
+    # P = np.ones(shape=(game_array.shape[0], 5, 5, 10), dtype=np.float32) * (1/250)
     V = game_array[:, 0, 0, 5::3].astype(np.float32)
-    return P.copy(order='C'), V.copy(order='C')
+    return tmp_P.copy(order='C'), V  # .copy(order='C')
 
 
 class RandomPlayer(Player):

@@ -1,3 +1,4 @@
+
 import numpy as np
 from tqdm import tqdm
 
@@ -24,7 +25,38 @@ def play_matches(players, num_matches=1, max_turns=100):
     return scores
 
 
+def speed_test():
+    from multiprocessing import Pool
+    from time import time
+
+    n_threads = 8
+    t = time()
+    with Pool(n) as pool:
+        results = pool.map(speed_test, [None] * n_threads)
+    t = time() - t
+    simulations = sum(results)
+    print(f'{simulations / t: 0.1f} simulations per second')
+
+def speed_job(*args):
+    n = 25
+    s = 800
+    P = player.RandomMCTSPlayer(name="R2", num_simulations=s)
+
+    sims = 0
+    for _ in range(n):
+        game = core.LoggerState()
+        P.sync_with_game(game)
+        while 1:
+            move = P.choose_move(game)
+            sims += s
+            P.done_move(move)
+            if game.do_move(*move) is not None:
+                break
+    return sims
+
+
 if __name__ == '__main__':
+
     players = [
         player.RandomMCTSPlayer(name="R2", num_simulations=500),
         player.RandomPlayer(name="R1"),
