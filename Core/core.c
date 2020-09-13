@@ -332,18 +332,16 @@ static PyObject*
 core_selfplay(PyObject* self, PyObject* args, PyObject *kwargs)
 {
 
- static char* kwlist[] = {"inference_method", "num_samples", NULL};
+ static char* kwlist[] = {"inference_method", "num_samples", "num_simulations", NULL};
   PyObject* inference_method = NULL;
-  int num_samples = 0;
+  int num_samples = 0, num_simulations = 0;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oi", kwlist, 
-            &inference_method, &num_samples)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oii", kwlist, 
+            &inference_method, &num_samples, &num_simulations)) {
     return NULL;
   }
 
-  self_play(inference_method, num_samples);
-
-  Py_RETURN_NONE;
+  return self_play(inference_method, num_samples, num_simulations);
 }
 
 

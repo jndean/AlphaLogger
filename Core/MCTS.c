@@ -92,32 +92,40 @@ void MCTSNode_init_as_root(MCTSNode* node, LoggerState* state, PyObject* inferen
 MCTS* MCTS_new(PyObject* inference_method) {
     MCTS* mcts = malloc(sizeof(MCTS));
     MALLOC_CHECK(mcts);
-    mcts->root_node = malloc(sizeof(MCTSNode));
-    MALLOC_CHECK(mcts->root_node);
     mcts->inference_method = inference_method;
     Py_INCREF(inference_method);
     return mcts;
 }
 
 void MCTS_free(MCTS* mcts) {
-    MCTSNode_free(mcts->root_node);
+    if (mcts->root_node != NULL)
+        MCTSNode_free(mcts->root_node);
     Py_DECREF(mcts->inference_method);
     free(mcts);
 }
+
 
 /* 
    Leave 'state' as NULL to start with a random starting state
 */
 void MCTS_init(MCTS* mcts, LoggerState* state) {
-    MCTSNode_init_as_root(mcts->root_node, state, mcts->inference_method);
+    if (state != NULL) {
+        mcts->root_node = malloc(sizeof(MCTSNode));
+        MALLOC_CHECK(mcts->root_node);
+        MCTSNode_init_as_root(mcts->root_node, state, mcts->inference_method);
+    } else {
+        mcts->root_node = NULL;
+    }
     mcts->current_leaf_node = NULL;
 }
 
 
 void MCTS_sync_with_game(MCTS* mcts, LoggerState* state) {
-    for (int i = 0; i < NUM_MOVES; ++i) {
-        if (mcts->root_node->children[i] != NULL)
-            MCTSNode_free(mcts->root_node->children[i]);
+    if (mcts->root_node != NULL) {
+        for (int i = 0; i < NUM_MOVES; ++i) {
+            if (mcts->root_node->children[i] != NULL)
+                MCTSNode_free(mcts->root_node->children[i]);
+        }
     }
     MCTS_init(mcts, state);
 }
@@ -128,7 +136,18 @@ void MCTS_sync_with_game(MCTS* mcts, LoggerState* state) {
     required if the leaf node is a game-over state, since it's value is predefined
 */
 int MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
-    
+    // Special case: if there's no root node, create a random one, don't pick a move,
+    // arrange the initial state for batched inference
+    if (mcts->root_node == NULL) {
+        mcts->root_node = malloc(sizeof(MCTSNode));
+        MALLOC_CHECK(mcts->root_node);
+        MCTSNode_init(mcts->root_node, NULL, NULL);
+        mcts->current_leaf_node = mcts->root_node;
+        LoggerState_getstatearray(&mcts->root_node->state, inference_array);
+        return 1;
+    }
+
+
     MCTSNode* node = mcts->root_node;
     int move_idx = -1;
 
@@ -196,8 +215,6 @@ void MCTS_search_backward_pass(MCTS* mcts) {
         node->W[move_idx] = V[current_player];
         node->N[move_idx]++;
         node->sumN++;
-
-        // printf("bkwd %p\n", node);
     }
 
 }
