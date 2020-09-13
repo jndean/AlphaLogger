@@ -31,14 +31,14 @@ def speed_test():
 
     n_threads = 8
     t = time()
-    with Pool(n) as pool:
-        results = pool.map(speed_test, [None] * n_threads)
+    with Pool(n_threads) as pool:
+        results = pool.map(_speed_job, [None] * n_threads)
     t = time() - t
     simulations = sum(results)
     print(f'{simulations / t: 0.1f} simulations per second')
 
-def speed_job(*args):
-    n = 25
+def _speed_job(*args):
+    n = 50
     s = 800
     P = player.RandomMCTSPlayer(name="R2", num_simulations=s)
 
@@ -58,8 +58,8 @@ def speed_job(*args):
 if __name__ == '__main__':
 
     players = [
-        player.RandomMCTSPlayer(name="R2", num_simulations=500),
-        player.RandomPlayer(name="R1"),
+        player.RandomPlayer(name="Random"),
+        player.RandomMCTSPlayer(name="Random MCTS", num_simulations=500),
     ]
     num_matches = 100
     max_turns = 50

@@ -136,13 +136,12 @@ int MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     // Stochastically choose branches until a leaf node is reached
     while (1) {
         if (node->state.game_winner != -1) {
-            // printf("TODO: gameover\n");
             mcts->current_leaf_node = node;
             return 0;
         }
 
         // Find the move maximising U
-        float maxU = -1;
+        float maxU = -FLT_MAX;
         float sqrt_sumN = sqrt((float)node->sumN);
         for (size_t i = 0; i < 5*5*10; ++i) {
             if (!node->state.legal_moves[i])
