@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "logger.h"
 #include "MCTS.h"
+#include "selfplay.h"
 
 
   
@@ -60,8 +61,7 @@ PyLoggerState_init(PyLoggerState *self, PyObject *args, PyObject *kwds)
 static PyObject*
 PyLoggerState_getstatearray(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
 {
-  const int num_channels = 4 + 3 * NUM_PLAYERS;
-  npy_intp dims[] = {5, 5, num_channels};
+  npy_intp dims[] = {5, 5, NUM_STATE_ARRAY_CHANNELS};
   PyObject *out_arr = PyArray_SimpleNew(3, dims, NPY_INT8);
   if (out_arr == NULL) 
     return NULL;
@@ -110,7 +110,7 @@ PyLoggerState_domove(PyLoggerState *self, PyObject* args, PyObject* keywds)
 
   Move move = {y, x, action, protest_y, protest_x};
   int winner = LoggerState_domove(self->state, move);
-  
+
   if (winner == -1) {
     Py_RETURN_NONE;
   } else {
@@ -141,16 +141,7 @@ PyLoggerState_test(PyLoggerState *self, PyObject *Py_UNUSED(ignored))
     }
     free(state);
   }
-  /*
-  Move move = {.y = 3, .x = 2, .action = 4, .protest_y = 0, .protest_x = 0};
-  LoggerState_domove(self->state, move);
-  for (int i=0; i < 10; ++i){
-    move = (Move){.y = 3, .x = 2, .action = 9, .protest_y = 0, .protest_x = 0};
-    LoggerState_domove(self->state, move);
-  }
-  move = (Move){.y = 3, .x = 2, .action = 0, .protest_y = 0, .protest_x = 0};
-  LoggerState_domove(self->state, move);
-  */
+
   Py_RETURN_NONE;
 }
 
@@ -272,7 +263,7 @@ PyMCTS_do_move(PyMCTS *self, PyObject *args)
   if (!PyArg_ParseTuple(args, "i", &move_idx))
     return NULL;
 
-  if (move_idx < 0 || move_idx >= 5 * 5 * 10) {
+  if (move_idx < 0 || move_idx >= NUM_MOVES) {
     PyErr_SetString(PyExc_ValueError, "Invalid move_idx given to MCTS.done_move");
     return NULL;
   }
@@ -295,8 +286,6 @@ PyMCTS_test(PyMCTS *self, PyObject *Py_UNUSED(ignored))
 }
 
 static PyMethodDef PyMCTS_methods[] = {
-    // {"get_state_array", (PyCFunction) PyMCTS_getstatearray, METH_NOARGS,
-    //  "Get the board state as a numpy array"},
     {"choose_move", (PyCFunction) PyMCTS_choose_move, METH_VARARGS | METH_KEYWORDS,
      "Assuming MCTS simulations have been run, pick a move to do"},
     {"done_move", (PyCFunction) PyMCTS_do_move, METH_VARARGS,
@@ -340,81 +329,20 @@ core_testMCTSsearch(PyObject* self, PyObject* args){
 
 
 static PyObject*
-core_testMCTSselfplay(PyObject* self, PyObject* args)
+core_selfplay(PyObject* self, PyObject* args, PyObject *kwargs)
 {
 
+ static char* kwlist[] = {"inference_method", "num_samples", NULL};
   PyObject* inference_method = NULL;
-  if (!PyArg_ParseTuple(args, "O", &inference_method))
-        return NULL;
+  int num_samples = 0;
 
-  //omp_set_num_threads(10);
-  const int batch_size = 1;
-  const int num_simulations = 5;
-
-  // Create numpy arrays for inference
-  npy_intp input_dims[] = {batch_size, 5, 5, 4 + 3 * NUM_PLAYERS};
-  PyObject* input_arr = PyArray_SimpleNew(4, input_dims, NPY_INT8);
-  MALLOC_CHECK(input_arr);
-  int8_t* input_data = PyArray_GETPTR1((PyArrayObject*) input_arr, 0);
-
-  const int input_stride = 5 * 5 * (4 + 3 * NUM_PLAYERS);
-  const int P_stride = 5 * 5 * 10;
-  const int V_stride = NUM_PLAYERS;
-
-  // Set up MCTS managers
-  MCTS* mcts_array[batch_size];
-  for (int i = 0; i < batch_size; ++i) {
-    MCTS* mcts = MCTS_new(inference_method);
-    MCTS_init(mcts, NULL);
-    LoggerState_getstatearray(&mcts->root_node->state, &input_data[i * input_stride]);
-    mcts_array[i] = mcts;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oi", kwlist, 
+            &inference_method, &num_samples)) {
+    return NULL;
   }
 
-    // Perform batched inference on the root game states
-    PyObject* inference_args = PyTuple_Pack(1, input_arr);
-    PyObject* P_and_V = PyObject_CallObject(inference_method, inference_args);
-    float* P = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 0), 0);
-    float* V = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 1), 0);
-    for (int i = 0; i < batch_size; ++i) {
-      MCTSNode_unpack_inference(mcts_array[i]->root_node, &P[i * P_stride], &V[i * V_stride]);
-    }
-    Py_DECREF(P_and_V);
+  self_play(inference_method, num_samples);
 
-  // Main play loop
-  for (int move_num = 0; move_num < 1; ++move_num) {
-
-    // Conduct num_simulations searches
-    for (int s = 0; s < num_simulations; ++s) {
-
-      // #pragma omp parallel for
-      for (int i = 0; i < batch_size; ++i) {
-        MCTS_search_forward_pass(mcts_array[i], &input_data[input_stride * i]);
-      }
-
-      // Perform batched inference on the leaf game states
-      P_and_V = PyObject_CallObject(inference_method, inference_args);
-      P = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 0), 0);
-      V = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 1), 0);
-
-      // Unpack infernces into leaf nodes and backpropogate scores
-      for (int i = 0; i < batch_size; ++i) {
-        MCTS* mcts = mcts_array[i];
-
-        MCTSNode_unpack_inference(mcts->current_leaf_node, &P[i * P_stride], &V[i * V_stride]);
-        
-        MCTS_search_backward_pass(mcts);
-      }
-
-      Py_DECREF(P_and_V);
-    }
-  }
-
-
-  Py_DECREF(input_arr);
-  Py_DECREF(inference_args);
-  for(int i = 0; i < batch_size; ++i) {
-    MCTS_free(mcts_array[i]);
-  }
   Py_RETURN_NONE;
 }
 
@@ -423,7 +351,7 @@ core_testMCTSselfplay(PyObject* self, PyObject* args)
 
 static PyMethodDef CoreMethods[] = {
     {"test_MCTS_search",  core_testMCTSsearch, METH_VARARGS, ""},
-    {"test_MCTS_selfplay",  core_testMCTSselfplay, METH_VARARGS, ""},
+    {"self_play",  (PyCFunction) core_selfplay, METH_VARARGS | METH_KEYWORDS, ""},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 

@@ -5,7 +5,7 @@ OMPFLAGS=-lgomp -fopenmp
 CFLAGS=-fPIC -Wall -Wno-unused-function -O3
 
 
-default: logger.o MCTS.o core.o
+default: logger.o MCTS.o selfplay.o core.o
 	$(CC) $(OMPFLAGS) $(CFLAGS) -shared $^ -o core.so
 
 core.o: core.c

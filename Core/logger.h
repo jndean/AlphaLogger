@@ -9,6 +9,11 @@
 
 
 #define NUM_PLAYERS 2
+#define NUM_SQUARES (5 * 5)
+#define NUM_MOVES (NUM_SQUARES * 10)
+#define NUM_STATE_ARRAY_CHANNELS (4 + 3 * NUM_PLAYERS)
+#define NUM_STATE_ARRAY_ELEMENTS (NUM_SQUARES * NUM_STATE_ARRAY_CHANNELS)
+
 
 /*
 LoggerState array format:
@@ -28,6 +33,7 @@ LoggerState array format:
 #define PROTESTERS  3
 
 
+
 typedef struct {
   int8_t y;
   int8_t x;
@@ -44,9 +50,9 @@ typedef struct LoggerState_{
   int8_t scores[NUM_PLAYERS];
   int8_t protesters[NUM_PLAYERS];
 
-  int8_t board[5 * 5 * 4];
-  int8_t unoccupied[5 * 5];
-  int8_t legal_moves[5 * 5 * 10];
+  int8_t board[NUM_SQUARES * 4];
+  int8_t unoccupied[NUM_SQUARES];
+  int8_t legal_moves[NUM_MOVES];
 
   uint8_t num_unprotested_trees;
   uint8_t current_player;

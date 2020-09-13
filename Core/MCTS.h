@@ -22,13 +22,13 @@
 
 typedef struct MCTSNode_{
     LoggerState state;
-    struct MCTSNode_* children[5 * 5 * 10];
+    struct MCTSNode_* children[NUM_MOVES];
     struct MCTSNode_* parent;
 
-    float P[5 * 5 * 10];
+    float P[NUM_MOVES];
     float V[NUM_PLAYERS];
-    uint32_t N[5 * 5 * 10];
-    float W[5 * 5 * 10];
+    uint32_t N[NUM_MOVES];
+    float W[NUM_MOVES];
 
     uint32_t sumN;
     int current_move_idx;

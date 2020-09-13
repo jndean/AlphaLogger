@@ -22,7 +22,7 @@ void MCTSNode_init(MCTSNode* node, MCTSNode* parent_node, LoggerState* state) {
 
 
 void MCTSNode_free(MCTSNode* node) {
-    for (int i=0; i<5*5*10; ++i) {
+    for (int i=0; i<NUM_MOVES; ++i) {
         if (node->children[i] != NULL) {
             MCTSNode_free(node->children[i]);
         }
@@ -64,8 +64,7 @@ MCTSNode* MCTSNode_create_child(MCTSNode* node, int move_idx) {
 void MCTSNode_init_as_root(MCTSNode* node, LoggerState* state, PyObject* inference_method) {
     MCTSNode_init(node, NULL, state);
 
-
-    npy_intp input_dims[] = {1, 5, 5, 4 + 3 * NUM_PLAYERS};
+    npy_intp input_dims[] = {1, 5, 5, NUM_STATE_ARRAY_CHANNELS};
     PyObject* input_arr = PyArray_SimpleNew(4, input_dims, NPY_INT8);
     MALLOC_CHECK(input_arr);
     int8_t* input_data = PyArray_GETPTR1((PyArrayObject*) input_arr, 0);
@@ -116,7 +115,7 @@ void MCTS_init(MCTS* mcts, LoggerState* state) {
 
 
 void MCTS_sync_with_game(MCTS* mcts, LoggerState* state) {
-    for (int i = 0; i < 5 * 5 * 10; ++i) {
+    for (int i = 0; i < NUM_MOVES; ++i) {
         if (mcts->root_node->children[i] != NULL)
             MCTSNode_free(mcts->root_node->children[i]);
     }
@@ -143,7 +142,7 @@ int MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
         // Find the move maximising U
         float maxU = -FLT_MAX;
         float sqrt_sumN = sqrt((float)node->sumN);
-        for (size_t i = 0; i < 5*5*10; ++i) {
+        for (size_t i = 0; i < NUM_MOVES; ++i) {
             if (!node->state.legal_moves[i])
                 continue;
             int32_t N = node->N[i];
@@ -209,7 +208,7 @@ int _choose_move_greedy(MCTS* mcts) {
     int8_t* legal_moves = mcts->root_node->state.legal_moves;
     int argmax = -1;
     uint32_t max = 0;
-    for (int i = 0; i < 5 * 5 * 10; ++i) {
+    for (int i = 0; i < NUM_MOVES; ++i) {
         if (legal_moves[i] && N[i] > max) {
             max = N[i];
             argmax = i;
@@ -229,7 +228,7 @@ int _choose_move_exploratory(MCTS* mcts) {
 
     uint32_t partial_sum = 0;
     int i;
-    for (i = 0; i < 5 * 5 * 10; ++i) {
+    for (i = 0; i < NUM_MOVES; ++i) {
         if (legal_moves[i]) {
             partial_sum += N[i];
             if (partial_sum > choice)
@@ -243,7 +242,7 @@ int _choose_move_exploratory(MCTS* mcts) {
 int MCTS_choose_move(MCTS* mcts, int num_simulations, int exploratory) {
 
     // Create numpy arrays for inference
-    static npy_intp input_dims[] = {1, 5, 5, 4 + 3 * NUM_PLAYERS};
+    static npy_intp input_dims[] = {1, 5, 5, NUM_STATE_ARRAY_CHANNELS};
     PyObject* input_arr = PyArray_SimpleNew(4, input_dims, NPY_INT8);
     MALLOC_CHECK(input_arr);
     int8_t* input_data = PyArray_GETPTR1((PyArrayObject*) input_arr, 0);
@@ -290,3 +289,4 @@ void MCTS_do_move(MCTS* mcts, int move_idx)
     old_root->children[move_idx] = NULL;
     MCTSNode_free(old_root);
 }
+

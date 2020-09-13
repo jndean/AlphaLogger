@@ -115,7 +115,6 @@ class MatchGUI:
         self.input_lock = False
 
     def set_protester(self, xy):
-        print(xy)
         if self.input_lock:
             return
         self.chosen_protester = xy
@@ -171,6 +170,8 @@ class MatchGUI:
             self.draw()
 
     def _check_protest(self, move):
+        return True  # No protesting now
+
         y, x, action, protest_y, protest_x = move
         state = self.game_state.get_state_array()
         if action != 8:
@@ -221,7 +222,7 @@ if __name__ == '__main__':
         players=[
             HumanPlayer(name='Human'),
             # player.Human(name="2ndHuman"),
-            RandomMCTSPlayer(name="R2", num_simulations=500),
-            # RandomPlayer(name="Random"),
+            # RandomMCTSPlayer(name="R2", num_simulations=500),
+            RandomPlayer(name="Random"),
         ]
     )

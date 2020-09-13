@@ -1,4 +1,5 @@
 
+
 #define MALLOC_CHECK(x) \
     do {if ((x) == NULL) { \
         fprintf(stderr, "Malloc failure: function \"%s\" in %s:%d\n", \

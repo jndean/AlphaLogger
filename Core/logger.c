@@ -134,7 +134,7 @@ static void _grow_square(LoggerState* state, int8_t* new_saplings, int8_t y, int
 
 
 static void _grow(LoggerState* state) {
-  int8_t new_saplings[5 * 5] = {0}; // Mark saplings that spawned this turn and so don't grow
+  int8_t new_saplings[NUM_SQUARES] = {0}; // Mark saplings that spawned this turn and so don't grow
 
   Vec2 player_pos = state->positions[state->current_player];
   for (int8_t i = 0; i < 5; ++i) {
@@ -281,11 +281,9 @@ static void _update_legal_moves(LoggerState* state) {
 */ 
 void LoggerState_getstatearray(LoggerState* state, int8_t* out_array) {
 
-  const int num_channels = 4 + 3 * NUM_PLAYERS;
-
   for(int xy = 0; xy < 25; ++xy) {
     int8_t* in = state->board + xy * 4;
-    int8_t* out = out_array + xy * num_channels;
+    int8_t* out = out_array + xy * NUM_STATE_ARRAY_CHANNELS;
     *(out++) = *(in++);
     *(out++) = *(in++);
     *(out++) = *(in++);
@@ -300,7 +298,7 @@ void LoggerState_getstatearray(LoggerState* state, int8_t* out_array) {
 
   for (int p = 0; p < NUM_PLAYERS; ++p) {
     Vec2 pos = state->positions[(p + state->current_player) % NUM_PLAYERS];
-    out_array[(5 * pos.y + pos.x) * num_channels + 4 + 3 * p] = 1;
+    out_array[(5 * pos.y + pos.x) * NUM_STATE_ARRAY_CHANNELS + (4 + 3 * p)] = 1;
   }
 }
 
