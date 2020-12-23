@@ -231,7 +231,7 @@ PyMCTS_sync_with_game(PyMCTS *self, PyObject *args)
     return NULL;
   }
 
-  MCTS_sync_with_game(self->mcts, ((PyLoggerState*)(game_state))->state);
+  MCTS_init(self->mcts, ((PyLoggerState*)(game_state))->state);
 
   Py_RETURN_NONE;
 }
@@ -248,11 +248,14 @@ PyMCTS_choose_move(PyMCTS *self, PyObject *args, PyObject *kwargs)
     return NULL;
   }
 
-  int move = MCTS_choose_move(self->mcts, num_simulations, exploratory);
-  if (move == -1) {
-    Py_RETURN_NONE;
-  }
-  return PyLong_FromLong((long)move);
+  MCTS_run_simulations(self->mcts, num_simulations);
+
+  int move;
+  if (exploratory) move = MCTS_choose_move_exploratory(self->mcts);
+  else             move = MCTS_choose_move_greedy(self->mcts);
+
+  if (move == -1) Py_RETURN_NONE;
+  return PyLong_FromLong((long) move);
 }
 
 

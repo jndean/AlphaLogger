@@ -72,7 +72,7 @@ void MCTSNode_init_as_root(MCTSNode* node, LoggerState* state, PyObject* inferen
 
     // Put the data in place
     LoggerState_getstatearray(&node->state, input_data);
-
+    printf("init as root\n");
     // Do inference
     PyObject* P_and_V = PyObject_CallObject(inference_method, inference_args);
     float* P = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 0), 0);
@@ -94,6 +94,8 @@ MCTS* MCTS_new(PyObject* inference_method) {
     MALLOC_CHECK(mcts);
     mcts->inference_method = inference_method;
     Py_INCREF(inference_method);
+    mcts->root_node = NULL;
+    mcts->current_leaf_node = NULL;
     return mcts;
 }
 
@@ -109,25 +111,15 @@ void MCTS_free(MCTS* mcts) {
    Leave 'state' as NULL to start with a random starting state
 */
 void MCTS_init(MCTS* mcts, LoggerState* state) {
+    if (mcts->root_node != NULL) MCTSNode_free(mcts->root_node);
+    mcts->root_node = NULL;
+    mcts->current_leaf_node = NULL;
+
     if (state != NULL) {
         mcts->root_node = malloc(sizeof(MCTSNode));
         MALLOC_CHECK(mcts->root_node);
         MCTSNode_init_as_root(mcts->root_node, state, mcts->inference_method);
-    } else {
-        mcts->root_node = NULL;
     }
-    mcts->current_leaf_node = NULL;
-}
-
-
-void MCTS_sync_with_game(MCTS* mcts, LoggerState* state) {
-    if (mcts->root_node != NULL) {
-        for (int i = 0; i < NUM_MOVES; ++i) {
-            if (mcts->root_node->children[i] != NULL)
-                MCTSNode_free(mcts->root_node->children[i]);
-        }
-    }
-    MCTS_init(mcts, state);
 }
 
 
@@ -220,7 +212,7 @@ void MCTS_search_backward_pass(MCTS* mcts) {
 }
 
 
-int _choose_move_greedy(MCTS* mcts) {
+int MCTS_choose_move_greedy(MCTS* mcts) {
     uint32_t* N = mcts->root_node->N;
     int8_t* legal_moves = mcts->root_node->state.legal_moves;
     int argmax = -1;
@@ -235,28 +227,27 @@ int _choose_move_greedy(MCTS* mcts) {
 }
 
 
-int _choose_move_exploratory(MCTS* mcts) {
+int MCTS_choose_move_exploratory(MCTS* mcts) {
     uint32_t* N = mcts->root_node->N;
     int8_t* legal_moves = mcts->root_node->state.legal_moves;
 
-    uint8_t sumN = mcts->root_node->sumN;
-    if (sumN == 0) return -1;
+    uint32_t sumN = mcts->root_node->sumN;
     uint32_t choice = ((uint32_t) rand()) % sumN;
-
     uint32_t partial_sum = 0;
-    int i;
-    for (i = 0; i < NUM_MOVES; ++i) {
+    for (int i = 0; i < NUM_MOVES; ++i) {
         if (legal_moves[i]) {
             partial_sum += N[i];
             if (partial_sum > choice)
-                break;
+                return i;
         } 
     }
-    return i;
+
+    printf("This shouldn't happen\n");
+    exit(1702);
 }
 
 
-int MCTS_choose_move(MCTS* mcts, int num_simulations, int exploratory) {
+void MCTS_run_simulations(MCTS* mcts, int num_simulations) {
 
     // Create numpy arrays for inference
     static npy_intp input_dims[] = {1, 5, 5, NUM_STATE_ARRAY_CHANNELS};
@@ -284,11 +275,6 @@ int MCTS_choose_move(MCTS* mcts, int num_simulations, int exploratory) {
 
     Py_DECREF(input_arr);
     Py_DECREF(inference_args);
-
-    // Choose a move (child node) based on visit counts
-    if (exploratory) 
-        return _choose_move_exploratory(mcts);
-    return _choose_move_greedy(mcts);
 }
 
 
@@ -299,9 +285,14 @@ void MCTS_do_move(MCTS* mcts, int move_idx)
     // Make the corresponding child node the new root node
     // Create a node if no such child exists
     mcts->root_node = old_root->children[move_idx];
-    if (mcts->root_node == NULL) 
+    if (mcts->root_node == NULL) {
         mcts->root_node = MCTSNode_create_child(old_root, move_idx);
+        printf("Child with no inference: %d\n", move_idx);
+        // printf("This creates a child that has had no inference performed?\n");
+        // printf("Put 'inferred' flag in node, use it for root_node too?\n");
+    }
     mcts->root_node->parent = NULL;
+    mcts->current_leaf_node = NULL;
 
     old_root->children[move_idx] = NULL;
     MCTSNode_free(old_root);

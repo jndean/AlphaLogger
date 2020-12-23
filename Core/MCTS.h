@@ -46,11 +46,12 @@ typedef struct MCTS_{
 MCTS* MCTS_new(PyObject* inference_method);
 void MCTS_free(MCTS* mcts);
 void MCTS_init(MCTS* mcts, LoggerState* state);
-void MCTS_sync_with_game(MCTS* mcts, LoggerState* state);
 void MCTSNode_unpack_inference(MCTSNode* node, float* P, float* V);
 int MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array);
 void MCTS_search_backward_pass(MCTS* mcts);
-int MCTS_choose_move(MCTS* mcts, int num_simulations, int exploratory);
+void MCTS_run_simulations(MCTS* mcts, int num_simulations);
+int MCTS_choose_move_exploratory(MCTS* mcts);
+int MCTS_choose_move_greedy(MCTS* mcts);
 void MCTS_do_move(MCTS* mcts, int move_idx);
 
 

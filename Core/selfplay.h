@@ -18,5 +18,4 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
 
 
 
-
 #endif  /* SELFPLAY_H */

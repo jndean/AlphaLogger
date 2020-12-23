@@ -45,6 +45,7 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
   // Set up MCTS managers
   MCTS* mcts_array[batch_size];
   float* game_starts[batch_size];
+  char inference_required[batch_size];
   for (int i = 0; i < batch_size; ++i) {
     MCTS* mcts = MCTS_new(inference_method);
     MCTS_init(mcts, NULL);
@@ -52,15 +53,16 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
     game_starts[i] = &scores_data[i * NUM_PLAYERS];
   }
 
-  // Main play loop
+  // Main selfplay loop
   for (int m = 0; m < num_moves; ++m) {
 
-    // Conduct num_simulations searches
+    // To choose a move, do num_simulations searches
     for (int s = 0; s < num_simulations; ++s) {
 
-      #pragma omp parallel for
+      // #pragma omp parallel for
       for (int i = 0; i < batch_size; ++i) {
-        MCTS_search_forward_pass(mcts_array[i], &inference_data[i * NUM_STATE_ARRAY_ELEMENTS]);
+        inference_required[i] = MCTS_search_forward_pass(
+        	mcts_array[i], &inference_data[i * NUM_STATE_ARRAY_ELEMENTS]);
       }
 
       // Perform batched inference on the leaf game states
@@ -68,8 +70,8 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
       float* P = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 0), 0);
       float* V = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 1), 0);
 
-      // Unpack infernces into leaf nodes and backpropogate scores
-      #pragma omp parallel for
+      // Unpack inferences into leaf nodes and backpropogate scores
+      // #pragma omp parallel for
       for (int i = 0; i < batch_size; ++i) {
         MCTSNode_unpack_inference(mcts_array[i]->current_leaf_node, &P[i * NUM_MOVES], &V[i * NUM_PLAYERS]);
         MCTS_search_backward_pass(mcts_array[i]);
@@ -78,6 +80,20 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
       Py_DECREF(P_and_V);
     }
 
+    for (int i = 0; i < batch_size; ++i) {
+	    // Copy the state and enhanced probabilities out of the root nodes
+	    MCTS* mcts = mcts_array[i];
+    	LoggerState_getstatearray(&mcts->root_node->state, &states_data[i * NUM_STATE_ARRAY_ELEMENTS]);
+
+    	// Advance the games one move
+    	int move = MCTS_choose_move_exploratory(mcts);
+    	MCTS_do_move(mcts, move);
+    	if (mcts->root_node->state.game_winner != -1) {
+    		MCTS_init(mcts, NULL);
+    	} 
+    }
+
+    states_data += NUM_STATE_ARRAY_ELEMENTS * batch_size;
   }
 
   // Clear up working space
@@ -89,5 +105,5 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
 
 
   // Return tuple of arrays
-  return PyTuple_Pack(1, states_arr, probs_arr, scores_arr);
+  return PyTuple_Pack(3, states_arr, probs_arr, scores_arr);
 }
