@@ -30,7 +30,7 @@ def uniform_probs_from_game(game):
     return probs
 
 
-static_P = (np.ones(shape=(1, 5, 5, 10), dtype=np.float32) * (1/250)).copy(order='C')
+static_P = (np.ones(shape=(100, 5, 5, 10), dtype=np.float32) * (1/250)).copy(order='C')
 static_V = np.array([0, 0], dtype=np.float32).copy(order='C')
 def uniform_inference(game_array):
     # return static_P, static_V

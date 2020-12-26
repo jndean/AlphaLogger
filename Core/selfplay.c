@@ -15,7 +15,7 @@
 
 PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulations) {
 
-  const int batch_size = 1;
+  const int batch_size = 10;
   omp_set_num_threads(batch_size);
 
   int num_moves = num_samples / batch_size;
