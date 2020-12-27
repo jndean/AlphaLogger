@@ -42,6 +42,15 @@ void MCTSNode_unpack_inference(MCTSNode* node, float* P, float* V) {
 }
 
 
+void MCTSNode_compute_mcts_probs(MCTSNode* node, float* out) {
+    uint32_t* N = node->N;
+    float over_sum_N = 1 / node->sumN;
+    for (int i = 0; i < NUM_MOVES; ++i) {
+        *(out++) = *(N++) * over_sum_N;
+    }
+}
+
+
 MCTSNode* MCTSNode_create_child(MCTSNode* node, int move_idx) {
     MCTSNode* child_node = malloc(sizeof(MCTSNode));
     MALLOC_CHECK(child_node);
@@ -72,7 +81,7 @@ void MCTSNode_init_as_root(MCTSNode* node, LoggerState* state, PyObject* inferen
 
     // Put the data in place
     LoggerState_getstatearray(&node->state, input_data);
-    printf("init as root\n");
+
     // Do inference
     PyObject* P_and_V = PyObject_CallObject(inference_method, inference_args);
     float* P = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 0), 0);
@@ -204,7 +213,7 @@ void MCTS_search_backward_pass(MCTS* mcts) {
         int move_idx = node->current_move_idx;
         int current_player = node->state.current_player;
 
-        node->W[move_idx] = V[current_player];
+        node->W[move_idx] += V[current_player];
         node->N[move_idx]++;
         node->sumN++;
     }

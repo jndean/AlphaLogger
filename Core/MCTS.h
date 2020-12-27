@@ -47,6 +47,7 @@ MCTS* MCTS_new(PyObject* inference_method);
 void MCTS_free(MCTS* mcts);
 void MCTS_init(MCTS* mcts, LoggerState* state);
 void MCTSNode_unpack_inference(MCTSNode* node, float* P, float* V);
+void MCTSNode_compute_mcts_probs(MCTSNode* node, float* out);
 int MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array);
 void MCTS_search_backward_pass(MCTS* mcts);
 void MCTS_run_simulations(MCTS* mcts, int num_simulations);

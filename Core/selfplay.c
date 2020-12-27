@@ -84,6 +84,7 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
 	    // Copy the state and enhanced probabilities out of the root nodes
 	    MCTS* mcts = mcts_array[i];
     	LoggerState_getstatearray(&mcts->root_node->state, &states_data[i * NUM_STATE_ARRAY_ELEMENTS]);
+      MCTSNode_compute_mcts_probs(mcts->root_node, &probs_data[i * NUM_MOVES]);
 
     	// Advance the games one move
     	int move = MCTS_choose_move_exploratory(mcts);
@@ -94,6 +95,8 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
     }
 
     states_data += NUM_STATE_ARRAY_ELEMENTS * batch_size;
+    probs_data += NUM_MOVES * batch_size;
+    scores_data += NUM_PLAYERS * batch_size;
   }
 
   // Clear up working space
