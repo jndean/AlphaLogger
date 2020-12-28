@@ -194,7 +194,7 @@ int MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     if (leaf_node->state.game_winner != -1) {
         for (int i = 0; i < NUM_PLAYERS; ++i)
             leaf_node->V[i] = -1;
-        leaf_node->V[leaf_node->state.game_winner] = 1;    
+        leaf_node->V[leaf_node->state.game_winner] = 1;
         return 0;
     }
 
@@ -239,6 +239,8 @@ int MCTS_choose_move_greedy(MCTS* mcts) {
 int MCTS_choose_move_exploratory(MCTS* mcts) {
     uint32_t* N = mcts->root_node->N;
     int8_t* legal_moves = mcts->root_node->state.legal_moves;
+
+    // TODO: add Dirichlet noise
 
     uint32_t sumN = mcts->root_node->sumN;
     uint32_t choice = ((uint32_t) rand()) % sumN;
