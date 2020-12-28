@@ -15,7 +15,7 @@
 
 PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulations) {
 
-  const int batch_size = 1;
+  const int batch_size = 32;
   omp_set_num_threads(batch_size);
 
   int num_moves = num_samples / batch_size;
@@ -119,11 +119,11 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
   // Assign a draw to unfinished games
   for (int thread = 0; thread < batch_size; ++thread) {
     float* score = &scores_data[thread * NUM_PLAYERS];
-    for (int i = 0; i <= move_counts[thread]; ++i) {
+    for (int i = 0; i < move_counts[thread]; ++i) {
+      score -= NUM_PLAYERS * batch_size;
       for (int j = 0; j < NUM_PLAYERS; ++j) {
         score[j] = 0;
       }
-      score -= NUM_PLAYERS * batch_size;
     }
   }
 
