@@ -15,8 +15,9 @@
 
 PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulations) {
 
-  const int batch_size = 32;
-  omp_set_num_threads(batch_size);
+  const int batch_size = 128;
+  const int max_threads = 8;
+  omp_set_num_threads(batch_size > max_threads ? max_threads : batch_size);
 
   int num_moves = num_samples / batch_size;
   num_samples = num_moves * batch_size;
@@ -24,11 +25,11 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
   // Create numpy arrays
   npy_intp inference_dims[] = {batch_size, 5, 5, NUM_STATE_ARRAY_CHANNELS};
   npy_intp states_dims[]    = {num_samples, 5, 5, NUM_STATE_ARRAY_CHANNELS};
-  npy_intp probs_dims[]     = {num_samples, 5, 5, 10};
+  npy_intp probs_dims[]     = {num_samples, 5 * 5 * 10};
   npy_intp scores_dims[]    = {num_samples, NUM_PLAYERS};
   PyObject* inference_arr = PyArray_SimpleNew(4, inference_dims, NPY_INT8);
   PyObject* states_arr    = PyArray_SimpleNew(4, states_dims   , NPY_INT8);
-  PyObject* probs_arr     = PyArray_SimpleNew(4, probs_dims    , NPY_FLOAT32);
+  PyObject* probs_arr     = PyArray_SimpleNew(2, probs_dims    , NPY_FLOAT32);
   PyObject* scores_arr    = PyArray_SimpleNew(2, scores_dims   , NPY_FLOAT32);
   MALLOC_CHECK(inference_arr);
   MALLOC_CHECK(states_arr);
@@ -44,7 +45,6 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
   for (int i = 0; i < num_samples * NUM_PLAYERS; ++i) {
     scores_data[i] = -1;
   }
-
 
   // Set up MCTS managers
   MCTS* mcts_array[batch_size];
@@ -63,7 +63,7 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
     // To choose a move, do num_simulations searches
     for (int s = 0; s < num_simulations; ++s) {
 
-      // #pragma omp parallel for
+      #pragma omp parallel for
       for (int thread = 0; thread < batch_size; ++thread) {
         inference_required[thread] = MCTS_search_forward_pass(
         	mcts_array[thread], &inference_data[thread * NUM_STATE_ARRAY_ELEMENTS]);
@@ -75,7 +75,7 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
       float* V = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 1), 0);
 
       // Unpack inferences into leaf nodes and backpropogate scores
-      // #pragma omp parallel for
+      #pragma omp parallel for
       for (int thread = 0; thread < batch_size; ++thread) {
         // Don't overwrite the V values if they're set by an actual win
         if(inference_required[thread]) {
@@ -87,6 +87,7 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
       Py_DECREF(P_and_V);
     }
 
+    #pragma omp parallel for
     for (int thread = 0; thread < batch_size; ++thread) {
 	    // Copy the state and enhanced probabilities out of the root nodes
 	    MCTS* mcts = mcts_array[thread];
@@ -114,7 +115,11 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
     states_data += NUM_STATE_ARRAY_ELEMENTS * batch_size;
     probs_data += NUM_MOVES * batch_size;
     scores_data += NUM_PLAYERS * batch_size;
+
+    printf("\rmove %d/%d", m+1, num_moves);
+    fflush(stdout);
   }
+  printf("\n");
 
   // Assign a draw to unfinished games
   for (int thread = 0; thread < batch_size; ++thread) {

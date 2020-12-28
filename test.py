@@ -1,22 +1,20 @@
 from time import time
+from time import time
 
 import numpy as np
 
 import core
 import player
-# from model import create_model
+from model import create_model
 
 
 num_moves = 5 * 5 * 10
-S, P, V = core.self_play(player.uniform_inference, 10000, 50)
+num_state_array_channels = core.num_players * 3 + 4
 
-P = P.reshape((-1, num_moves))
 
-print(S[:, 0, 0, 5::10].flatten())
-print(S.shape, P.shape, V.shape)
-
+print('Building model...')
 model = create_model(
-	input_shape=S[0].shape,
+	input_shape=(5, 5, num_state_array_channels),
 	num_moves=num_moves,
 	num_players=core.num_players,
 	num_resnet_blocks=10,
@@ -24,7 +22,17 @@ model = create_model(
 	value_dense_neurons=64,
 )
 
+def infer(x):
+	return tuple(model.predict(x))
+
+
+print('Generating games...')
+t = time()
+S, P, V = core.self_play(infer, 1280, 50)
+print(time() - t, 'seconds')
+
+print('Training...')
 model.fit(
 	x=S,
-	y={'policy_output': P, 'value_output': V}
+	y={'policy_output': P, 'value_output': V},
 )
