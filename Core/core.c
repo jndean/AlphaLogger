@@ -397,5 +397,7 @@ PyMODINIT_FUNC PyInit_core(void)
         return NULL;
     }
 
+    PyModule_AddIntConstant(m, "num_players", NUM_PLAYERS);
+
     return m;
 }
