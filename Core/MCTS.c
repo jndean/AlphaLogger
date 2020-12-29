@@ -3,6 +3,43 @@
 
 
 /* 
+  A bit of machinery to cache discarded MCTSNodes in the MCTS to save on mallocs
+  Is thread-safe in this application because each MCTS is only touched by a single thread at a time.
+*/
+#ifdef CACHE_MCTS_NODES
+
+static inline MCTSNode* MCTS_malloc_MCTSNode(MCTS* mcts) {
+    MCTSNode* node;
+    if (mcts->node_cache == NULL) {
+        node = malloc(sizeof(MCTSNode));
+        MALLOC_CHECK(node);
+    } else {
+        node = mcts->node_cache;
+        mcts->node_cache = *((MCTSNode**) node);
+    }
+    return node;
+}
+
+static inline void MCTS_free_MCTSNode(MCTS* mcts, MCTSNode* node) {
+    *((MCTSNode**) node) = mcts->node_cache;
+    mcts->node_cache = node;
+}
+
+#else
+
+static inline MCTSNode* MCTS_malloc_MCTSNode(MCTS* mcts) {
+    MCTSNode* node = malloc(sizeof(MCTSNode));
+    MALLOC_CHECK(node);
+    return node;
+}
+static inline void MCTS_free_MCTSNode(MCTS* mcts, MCTSNode* node) {
+    free(node);
+}
+
+#endif
+
+
+/* 
    Leave 'parent_node' as NULL to imply this is the root node
    Leave 'state' as NULL to start with a random starting state
 */
@@ -21,15 +58,14 @@ void MCTSNode_init(MCTSNode* node, MCTSNode* parent_node, LoggerState* state) {
 }
 
 
-void MCTSNode_free(MCTSNode* node) {
+void MCTSNode_uninit(MCTS* mcts, MCTSNode* node) {
     for (int i=0; i<NUM_MOVES; ++i) {
         if (node->children[i] != NULL) {
-            MCTSNode_free(node->children[i]);
+            MCTSNode_uninit(mcts, node->children[i]);
         }
     }
-    free(node);
+    MCTS_free_MCTSNode(mcts, node);
 }
-
 
 void MCTSNode_unpack_inference(MCTSNode* node, float* P, float* V) {
     memcpy(node->P, P, sizeof(node->P));
@@ -51,9 +87,8 @@ void MCTSNode_compute_mcts_probs(MCTSNode* node, float* out) {
 }
 
 
-MCTSNode* MCTSNode_create_child(MCTSNode* node, int move_idx) {
-    MCTSNode* child_node = malloc(sizeof(MCTSNode));
-    MALLOC_CHECK(child_node);
+MCTSNode* MCTSNode_create_child(MCTS* mcts, MCTSNode* node, int move_idx) {
+    MCTSNode* child_node = MCTS_malloc_MCTSNode(mcts);
     node->children[move_idx] = child_node;
     MCTSNode_init(child_node, node, &node->state);
 
@@ -105,28 +140,42 @@ MCTS* MCTS_new(PyObject* inference_method) {
     Py_INCREF(inference_method);
     mcts->root_node = NULL;
     mcts->current_leaf_node = NULL;
+
+    #ifdef CACHE_MCTS_NODES
+    mcts->node_cache = NULL;
+    #endif
+
     return mcts;
 }
 
 void MCTS_free(MCTS* mcts) {
     if (mcts->root_node != NULL)
-        MCTSNode_free(mcts->root_node);
+        MCTSNode_uninit(mcts, mcts->root_node);
     Py_DECREF(mcts->inference_method);
+
+    #ifdef CACHE_MCTS_NODES
+    while (mcts->node_cache != NULL) {
+        MCTSNode* node = mcts->node_cache;
+        mcts->node_cache = *((MCTSNode**) node);
+        free(node);
+    }
+    #endif
+
     free(mcts);
 }
+
 
 
 /* 
    Leave 'state' as NULL to start with a random starting state
 */
 void MCTS_init(MCTS* mcts, LoggerState* state) {
-    if (mcts->root_node != NULL) MCTSNode_free(mcts->root_node);
+    if (mcts->root_node != NULL) MCTSNode_uninit(mcts, mcts->root_node);
     mcts->root_node = NULL;
     mcts->current_leaf_node = NULL;
 
     if (state != NULL) {
-        mcts->root_node = malloc(sizeof(MCTSNode));
-        MALLOC_CHECK(mcts->root_node);
+        mcts->root_node = MCTS_malloc_MCTSNode(mcts);
         MCTSNode_init_as_root(mcts->root_node, state, mcts->inference_method);
     }
 }
@@ -140,8 +189,7 @@ int MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     // Special case: if there's no root node, create a random one, don't pick a move,
     // arrange the initial state for batched inference
     if (mcts->root_node == NULL) {
-        mcts->root_node = malloc(sizeof(MCTSNode));
-        MALLOC_CHECK(mcts->root_node);
+        mcts->root_node = MCTS_malloc_MCTSNode(mcts);
         MCTSNode_init(mcts->root_node, NULL, NULL);
         mcts->current_leaf_node = mcts->root_node;
         LoggerState_getstatearray(&mcts->root_node->state, inference_array);
@@ -187,7 +235,7 @@ int MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     }
     
     // Create the new leaf node
-    MCTSNode* leaf_node = MCTSNode_create_child(node, move_idx);
+    MCTSNode* leaf_node = MCTSNode_create_child(mcts, node, move_idx);
     mcts->current_leaf_node = leaf_node;
 
     // No inference required if there's a winner
@@ -297,7 +345,7 @@ void MCTS_do_move(MCTS* mcts, int move_idx)
     // Create a node if no such child exists
     mcts->root_node = old_root->children[move_idx];
     if (mcts->root_node == NULL) {
-        mcts->root_node = MCTSNode_create_child(old_root, move_idx);
+        mcts->root_node = MCTSNode_create_child(mcts, old_root, move_idx);
         printf("Child with no inference: %d\n", move_idx);
         // printf("This creates a child that has had no inference performed?\n");
         // printf("Put 'inferred' flag in node, use it for root_node too?\n");
@@ -306,6 +354,6 @@ void MCTS_do_move(MCTS* mcts, int move_idx)
     mcts->current_leaf_node = NULL;
 
     old_root->children[move_idx] = NULL;
-    MCTSNode_free(old_root);
+    MCTSNode_uninit(mcts, old_root);
 }
 

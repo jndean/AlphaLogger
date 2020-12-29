@@ -15,4 +15,4 @@ core.o: core.c
 	$(CC) $(OMPFLAGS) $(PYFLAGS) $(CFLAGS) -c -o $@ $^
 
 clean:
-	rm logger.o MCTS.o core.o
+	rm logger.o MCTS.o core.o selfplay.o

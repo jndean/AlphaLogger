@@ -6,6 +6,10 @@
 #define PY_ARRAY_UNIQUE_SYMBOL ALPHALOGGER_PY_ARRAY_UNIQUE_SYMBOL
 #define NO_IMPORT_ARRAY
 
+#define C_PUCT 4
+#define MAX_THREADS 8
+#define CACHE_MCTS_NODES 
+
 #include<stdio.h>
 #include<stdlib.h>
 #include<stdint.h>
@@ -18,7 +22,6 @@
 #include "utils.h"
 #include "logger.h"
 
-#define C_PUCT 4
 
 typedef struct MCTSNode_{
     LoggerState state;
@@ -40,6 +43,9 @@ typedef struct MCTS_{
     PyObject* inference_method;
 	MCTSNode* root_node;
 	MCTSNode* current_leaf_node;
+#ifdef CACHE_MCTS_NODES
+    MCTSNode* node_cache;
+#endif
 } MCTS;
 
 

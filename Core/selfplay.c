@@ -16,8 +16,7 @@
 PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulations) {
 
   const int batch_size = 128;
-  const int max_threads = 8;
-  omp_set_num_threads(batch_size > max_threads ? max_threads : batch_size);
+  omp_set_num_threads(batch_size > MAX_THREADS ? MAX_THREADS : batch_size);
 
   int num_moves = num_samples / batch_size;
   num_samples = num_moves * batch_size;
@@ -138,7 +137,6 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
   for(int thread = 0; thread < batch_size; ++thread) {
     MCTS_free(mcts_array[thread]);
   }
-
 
   // Return tuple of arrays
   return PyTuple_Pack(3, states_arr, probs_arr, scores_arr);

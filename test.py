@@ -28,7 +28,7 @@ def infer(x):
 
 print('Generating games...')
 t = time()
-S, P, V = core.self_play(infer, 1280, 50)
+S, P, V = core.self_play(infer, 2560, 50)
 print(time() - t, 'seconds')
 
 print('Training...')
