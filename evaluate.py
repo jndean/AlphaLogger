@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
     players = [
         player.RandomPlayer(name="Random"),
-        player.RandomMCTSPlayer(name="Random MCTS", num_simulations=500),
+        player.RandomMCTSPlayer(name="Random MCTS", num_simulations=50),
     ]
     num_matches = 100
     max_turns = 50

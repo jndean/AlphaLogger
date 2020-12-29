@@ -48,13 +48,13 @@ class RandomPlayer(Player):
         return utilities.move_idx_to_tuple(move_idx)
 
 
-class RandomMCTSPlayer(Player):
+class MCTSPlayer(Player):
 
-    def __init__(self, num_simulations=400, exploratory=False, **kwargs):
+    def __init__(self, inference_method, num_simulations=400, exploratory=False, **kwargs):
         super().__init__(**kwargs)
         self.num_simulations = num_simulations
         self.exploratory = exploratory
-        self.mcts = core.MCTS(inference_method=uniform_inference)
+        self.mcts = core.MCTS(inference_method=inference_method)
 
     def sync_with_game(self, game):
         self.mcts.sync_with_game(game)
@@ -69,3 +69,16 @@ class RandomMCTSPlayer(Player):
     def done_move(self, move_tuple):
         self.mcts.done_move(utilities.move_tuple_to_idx(move_tuple))
 
+
+def RandomMCTSPlayer(**kwargs):
+    return MCTSPlayer(
+        uniform_inference, 
+        **kwargs
+    )
+
+
+def AlphaLoggerPlayer(model, **kwargs):
+    return MCTSPlayer(
+        lambda x: tuple(model.predict(x)), 
+        **kwargs
+    )

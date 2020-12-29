@@ -87,7 +87,7 @@ void MCTSNode_compute_mcts_probs(MCTSNode* node, float* out) {
 }
 
 
-MCTSNode* MCTSNode_create_child(MCTS* mcts, MCTSNode* node, int move_idx) {
+MCTSNode* MCTSNode_create_child(MCTSNode* node, int move_idx, MCTS* mcts) {
     MCTSNode* child_node = MCTS_malloc_MCTSNode(mcts);
     node->children[move_idx] = child_node;
     MCTSNode_init(child_node, node, &node->state);
@@ -235,7 +235,7 @@ int MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array) {
     }
     
     // Create the new leaf node
-    MCTSNode* leaf_node = MCTSNode_create_child(mcts, node, move_idx);
+    MCTSNode* leaf_node = MCTSNode_create_child(node, move_idx, mcts);
     mcts->current_leaf_node = leaf_node;
 
     // No inference required if there's a winner
@@ -339,13 +339,12 @@ void MCTS_run_simulations(MCTS* mcts, int num_simulations) {
 
 void MCTS_do_move(MCTS* mcts, int move_idx)
 {
-    MCTSNode* old_root = mcts->root_node;
-
     // Make the corresponding child node the new root node
     // Create a node if no such child exists
+    MCTSNode* old_root = mcts->root_node;
     mcts->root_node = old_root->children[move_idx];
     if (mcts->root_node == NULL) {
-        mcts->root_node = MCTSNode_create_child(mcts, old_root, move_idx);
+        mcts->root_node = MCTSNode_create_child(old_root, move_idx, mcts);
         printf("Child with no inference: %d\n", move_idx);
         // printf("This creates a child that has had no inference performed?\n");
         // printf("Put 'inferred' flag in node, use it for root_node too?\n");
