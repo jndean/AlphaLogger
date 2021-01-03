@@ -16,6 +16,8 @@
 #include<math.h>
 #include<float.h>
 
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
 #include<Python.h>
 #include <numpy/arrayobject.h>
 
@@ -43,6 +45,8 @@ typedef struct MCTS_{
     PyObject* inference_method;
 	MCTSNode* root_node;
 	MCTSNode* current_leaf_node;
+    gsl_rng* rng;
+
 #ifdef CACHE_MCTS_NODES
     MCTSNode* node_cache;
 #endif

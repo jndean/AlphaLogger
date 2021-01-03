@@ -20,13 +20,10 @@ The proof-of-concept is now complete, but it is sloooow beyond the point of viab
 Highspeed version Tasks:
 
 - [x] An efficient and thread-safe C implementation of Logger 
-
 - [x] An efficient and thread-safe C implementation of the MCTS
-- [ ] A fully parallelised self-play and training pipeline supporting batching inference over simultaneous games [ IN PROGRESS ]
+- [x] A fully parallelised self-play and training pipeline supporting batching inference over simultaneous games
 
 
 
 The C implementation of Logger can handle >20 million moves per second using 8 threads on a mobile i5-8250U.
-
-The C implementation of the Monte Carlo Tree Search can do ~1.5 million simulations per second using 8 threads on a mobile i5-8250U. One simulation is: one forward pass through the tree, the creation of a leaf node, dummy inference on that node's state, and one backward pass propagating information up to the root node. Of course, when a non-trivial inference method is added, that will dominate the time and the number of simulations will be much less.
-
+The C implementation of the Monte Carlo Tree Search can do ~1.5 million forward & backward passes of the on the tree per second using the same hardware. This is when using a constant inference function, not the neural network

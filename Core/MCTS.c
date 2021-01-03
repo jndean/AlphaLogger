@@ -141,6 +141,9 @@ MCTS* MCTS_new(PyObject* inference_method) {
     mcts->root_node = NULL;
     mcts->current_leaf_node = NULL;
 
+    mcts->rng = gsl_rng_alloc(gsl_rng_mt19937); // Mersenne Twister
+    gsl_rng_set(mcts->rng, (unsigned long int) mcts);
+
     #ifdef CACHE_MCTS_NODES
     mcts->node_cache = NULL;
     #endif
@@ -152,6 +155,7 @@ void MCTS_free(MCTS* mcts) {
     if (mcts->root_node != NULL)
         MCTSNode_uninit(mcts, mcts->root_node);
     Py_DECREF(mcts->inference_method);
+    gsl_rng_free(mcts->rng);
 
     #ifdef CACHE_MCTS_NODES
     while (mcts->node_cache != NULL) {
@@ -284,18 +288,36 @@ int MCTS_choose_move_greedy(MCTS* mcts) {
 }
 
 
+static double dirichlet_alphas[NUM_MOVES];
+__attribute__((constructor)) 
+void __initialize_dirichlet_alphas() {
+    for (int i = 0; i < NUM_MOVES; ++i) dirichlet_alphas[i] = 1;
+}
+
 int MCTS_choose_move_exploratory(MCTS* mcts) {
     uint32_t* N = mcts->root_node->N;
     int8_t* legal_moves = mcts->root_node->state.legal_moves;
 
-    // TODO: add Dirichlet noise
+    // Generate Dirichlet noise according to the original paper
+    double probs[NUM_MOVES];
+    gsl_ran_dirichlet(mcts->rng, NUM_MOVES, dirichlet_alphas, probs);
 
-    uint32_t sumN = mcts->root_node->sumN;
-    uint32_t choice = ((uint32_t) rand()) % sumN;
-    uint32_t partial_sum = 0;
+    double sum_legal_moves = 0;
     for (int i = 0; i < NUM_MOVES; ++i) {
         if (legal_moves[i]) {
-            partial_sum += N[i];
+            double summand = N[i] + probs[i];
+            probs[i] = summand;
+            sum_legal_moves += summand;
+        } else {
+            probs[i] = 0;
+        }
+    }
+
+    double choice = rand() * (sum_legal_moves / RAND_MAX);
+    double partial_sum = 0;
+    for (int i = 0; i < NUM_MOVES; ++i) {
+        if (legal_moves[i]) {
+            partial_sum += probs[i];
             if (partial_sum > choice)
                 return i;
         } 
