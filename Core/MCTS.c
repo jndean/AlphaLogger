@@ -92,14 +92,7 @@ MCTSNode* MCTSNode_create_child(MCTSNode* node, int move_idx, MCTS* mcts) {
     node->children[move_idx] = child_node;
     MCTSNode_init(child_node, node, &node->state);
 
-    Move move = {
-        .y = move_idx / (5 * 10),
-        .x = (move_idx / 10) % 5, 
-        .action = move_idx % 10, 
-        .protest_y = 0, 
-        .protest_x = 0
-    };
-    LoggerState_domove(&child_node->state, move);
+    LoggerState_domove(&child_node->state, move_idx);
 
     return child_node;
 }
@@ -365,12 +358,13 @@ void MCTS_do_move(MCTS* mcts, int move_idx)
     // Create a node if no such child exists
     MCTSNode* old_root = mcts->root_node;
     mcts->root_node = old_root->children[move_idx];
-    if (mcts->root_node == NULL) {
-        mcts->root_node = MCTSNode_create_child(old_root, move_idx, mcts);
-        printf("Child with no inference: %d\n", move_idx);
-        // printf("This creates a child that has had no inference performed?\n");
-        // printf("Put 'inferred' flag in node, use it for root_node too?\n");
+
+    if (mcts->root_node == NULL) {  
+        mcts->root_node = MCTS_malloc_MCTSNode(mcts);
+	LoggerState_domove(&old_root->state, move_idx);
+	MCTSNode_init_as_root(mcts->root_node, &old_root->state, mcts->inference_method);
     }
+    
     mcts->root_node->parent = NULL;
     mcts->current_leaf_node = NULL;
 

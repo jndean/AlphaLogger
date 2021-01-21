@@ -65,7 +65,9 @@ void LoggerState_reset(LoggerState* state) {
 /* 
   Advance the game state according to the current player making the given move
 */
-int LoggerState_domove(LoggerState* state, Move move) {
+int LoggerState_domove(LoggerState* state, int move_idx) {
+
+  Move move = Logger_movefromidx(move_idx);
   
   // Move player
   Vec2* pos = &state->positions[state->current_player];
@@ -99,6 +101,21 @@ int LoggerState_domove(LoggerState* state, Move move) {
   _update_legal_moves(state);
 
   return -1;  // No winner
+}
+
+
+Move Logger_movefromidx(int move_idx) {
+    return (Move) {
+	.y = move_idx / (5 * 10),
+	.x = (move_idx / 10) % 5, 
+	.action = move_idx % 10, 
+	.protest_y = 0, 
+	.protest_x = 0
+    };
+}
+
+int Logger_idxfrommove(Move move) {
+    return move.y * 50 + move.x * 10 + move.action;
 }
 
 

@@ -43,8 +43,8 @@ typedef struct MCTSNode_{
 
 typedef struct MCTS_{
     PyObject* inference_method;
-	MCTSNode* root_node;
-	MCTSNode* current_leaf_node;
+    MCTSNode* root_node;
+    MCTSNode* current_leaf_node;
     gsl_rng* rng;
 
 #ifdef CACHE_MCTS_NODES

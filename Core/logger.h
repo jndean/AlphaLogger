@@ -63,9 +63,10 @@ typedef struct LoggerState_{
 
 #define ON_BOARD(px, py) ((px >=0) && (px < 5) && (py >= 0) && (py < 5))
 
-
+Move Logger_movefromidx(int move_idx);
+int Logger_idxfrommove(Move move);
 void LoggerState_reset(LoggerState* state);
-int LoggerState_domove(LoggerState* state, Move move);
+int LoggerState_domove(LoggerState* state, int move_idx);
 void LoggerState_getstatearray(LoggerState* state, int8_t* out_array);
 void LoggerState_setpositions(LoggerState* state, Vec2* new_positions);
 

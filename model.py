@@ -1,11 +1,11 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+from tensorflow.keras.models import Model
 import tensorflow as tf
 from tensorflow.keras.layers import (
     Conv2D, BatchNormalization, ReLU, Input, Flatten, Dense, Lambda
 )
-from tensorflow.keras.models import Model
 
 
 

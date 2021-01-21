@@ -1,6 +1,6 @@
 CC=gcc
 
-PYFLAGS=-I/usr/include/python3.8/ -I/home/josef/AlphaLogger/venv/lib/python3.8/site-packages/numpy/core/include/
+PYFLAGS=-I/usr/include/python3.8/ -I/home/josef/Projects/AlphaLogger/venv/lib/python3.8/site-packages/numpy/core/include/
 GSLFLAGS=-L/usr/lib/x86_64-linux-gnu/ -lgsl -lgslcblas -lm
 OMPFLAGS=-lgomp -fopenmp
 CFLAGS=-fPIC -Wall -Wno-unused-function -g

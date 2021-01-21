@@ -108,8 +108,9 @@ PyLoggerState_domove(PyLoggerState *self, PyObject* args, PyObject* keywds)
                                      &y, &x, &action, &protest_y, &protest_x))
     return NULL;
 
-  Move move = {y, x, action, protest_y, protest_x};
-  int winner = LoggerState_domove(self->state, move);
+  
+  int move_idx = Logger_idxfrommove((Move){y, x, action, protest_y, protest_x});
+  int winner = LoggerState_domove(self->state, move_idx);
 
   if (winner == -1) {
     Py_RETURN_NONE;
@@ -136,8 +137,7 @@ PyLoggerState_test(PyLoggerState *self, PyObject *Py_UNUSED(ignored))
                 break;
             }
         }
-        Move move = {move_idx / 50, (move_idx / 10) % 5, move_idx % 10, 0, 0};
-        LoggerState_domove(state, move);
+        LoggerState_domove(state, move_idx);
     }
     free(state);
   }
