@@ -6,11 +6,11 @@ OMPFLAGS=-lgomp -fopenmp
 CFLAGS=-fPIC -Wall -Wno-unused-function -g
 
 
-default: logger.o MCTS.o selfplay.o core.o
+default: logger.o MCTS.o training.o core.o
 	$(CC) $^ -o core.so $(PYFLAGS) $(GSLFLAGS) $(OMPFLAGS) $(CFLAGS) -shared 
 
 %.o: %.c
 	$(CC) -c -o $@ $^ $(PYFLAGS) $(GSLFLAGS) $(OMPFLAGS) $(CFLAGS) 
 
 clean:
-	rm logger.o MCTS.o core.o selfplay.o
+	rm logger.o MCTS.o core.o training.o

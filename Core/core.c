@@ -10,7 +10,7 @@
 #include "utils.h"
 #include "logger.h"
 #include "MCTS.h"
-#include "selfplay.h"
+#include "training.h"
 
 
   

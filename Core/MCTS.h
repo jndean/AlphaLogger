@@ -18,8 +18,9 @@
 
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
-#include<Python.h>
 #include <numpy/arrayobject.h>
+#include <omp.h>
+#include<Python.h>
 
 #include "utils.h"
 #include "logger.h"
@@ -61,6 +62,10 @@ void MCTSNode_compute_mcts_probs(MCTSNode* node, float* out);
 int MCTS_search_forward_pass(MCTS* mcts, int8_t* inference_array);
 void MCTS_search_backward_pass(MCTS* mcts);
 void MCTS_run_simulations(MCTS* mcts, int num_simulations);
+void MCTS_run_batched_simulations(MCTS** mcts_array,
+				  PyObject* inference_method,
+				  int batch_size, int num_simulations,
+				  PyObject* np_inference_arr);
 int MCTS_choose_move_exploratory(MCTS* mcts);
 int MCTS_choose_move_greedy(MCTS* mcts);
 void MCTS_do_move(MCTS* mcts, int move_idx);

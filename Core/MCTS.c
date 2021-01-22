@@ -321,34 +321,73 @@ int MCTS_choose_move_exploratory(MCTS* mcts) {
 }
 
 
-void MCTS_run_simulations(MCTS* mcts, int num_simulations) {
+void MCTS_run_batched_simulations(MCTS** mcts_array,
+				  PyObject* inference_method,
+				  int batch_size,
+				  int num_simulations,
+				  PyObject* np_inference_arr) {
 
-    // Create numpy arrays for inference
-    static npy_intp input_dims[] = {1, 5, 5, NUM_STATE_ARRAY_CHANNELS};
-    PyObject* input_arr = PyArray_SimpleNew(4, input_dims, NPY_INT8);
-    MALLOC_CHECK(input_arr);
-    int8_t* input_data = PyArray_GETPTR1((PyArrayObject*) input_arr, 0);
-    PyObject* inference_args = PyTuple_Pack(1, input_arr);
+    omp_set_num_threads(batch_size > MAX_THREADS ? MAX_THREADS : batch_size);
 
-    for (int i = 0; i < num_simulations; ++i) {
-        // Do a forward pass, creating a leaf node and putting it's state in input_data
-        int inference_required = MCTS_search_forward_pass(mcts, input_data);
+    int8_t* inference_data = PyArray_GETPTR1((PyArrayObject*) np_inference_arr, 0);
+    PyObject* inference_args = PyTuple_Pack(1, np_inference_arr);
+    
+    char* inference_required = calloc(batch_size, sizeof(char));
+    
+    for (int s = 0; s < num_simulations; ++s) {
+	
+      // Do a forward pass, creating a leaf node and putting it's state in input_data
+        #pragma omp parallel for
+	for (int thread = 0; thread < batch_size; ++thread) {
+	    inference_required[thread] = MCTS_search_forward_pass(
+	        mcts_array[thread], &inference_data[thread * NUM_STATE_ARRAY_ELEMENTS]);
+	}
 
-        if (inference_required) {
-            // Perform inference to compute the P and V for the leaf node
-            PyObject* P_and_V = PyObject_CallObject(mcts->inference_method, inference_args);
-            float* P = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 0), 0);
-            float* V = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 1), 0);
-            MCTSNode_unpack_inference(mcts->current_leaf_node, P, V);
-            Py_DECREF(P_and_V);
-        }
+	// Perform batched inference on the leaf game states
+	PyObject* P_and_V = PyObject_CallObject(inference_method, inference_args);
+	float* P = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 0), 0);
+	float* V = PyArray_GETPTR1((PyArrayObject*) PyTuple_GET_ITEM(P_and_V, 1), 0);
+	
+	// Unpack inferences into leaf nodes and backpropogate scores
+        #pragma omp parallel for
+	for (int thread = 0; thread < batch_size; ++thread) {
+	    // Don't overwrite the V values if they're set by an actual win
+	    if(inference_required[thread]) {
+		MCTSNode_unpack_inference(
+	            mcts_array[thread]->current_leaf_node,
+		    &P[thread * NUM_MOVES],
+		    &V[thread * NUM_PLAYERS]
+	        );
+	    }
+	    MCTS_search_backward_pass(mcts_array[thread]);
+	}
 
-        // Backward pass, propagating the visit counts and V values back up the tree
-         MCTS_search_backward_pass(mcts);
+	Py_DECREF(P_and_V);
     }
 
-    Py_DECREF(input_arr);
+    //Py_DECREF(inference_arr);
     Py_DECREF(inference_args);
+    free(inference_required);
+}
+
+
+void MCTS_run_batched_simulations_wrapper(MCTS** mcts_array,
+					  int batch_size,
+					  int num_simulations) {
+    npy_intp np_inference_dims[] = {batch_size, 5, 5, NUM_STATE_ARRAY_CHANNELS};
+    PyObject* np_inference_arr = PyArray_SimpleNew(4, np_inference_dims, NPY_INT8);
+    MALLOC_CHECK(np_inference_arr);
+    MCTS_run_batched_simulations(mcts_array,
+				 mcts_array[0]->inference_method,
+				 batch_size,
+				 num_simulations,
+				 np_inference_arr);
+    Py_DECREF(np_inference_arr);
+}
+
+
+void MCTS_run_simulations(MCTS* mcts, int num_simulations) {
+    MCTS_run_batched_simulations_wrapper(&mcts, 1, num_simulations);
 }
 
 
