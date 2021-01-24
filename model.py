@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.keras.layers import (
     Conv2D, BatchNormalization, ReLU, Input, Flatten, Dense, Lambda
 )
-
+from tensorflow.keras.models import load_model
 
 
 def create_model(

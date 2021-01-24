@@ -8,7 +8,6 @@
    + Data augmentations
       - Random choose to keep samples, making them sparser
       - Transform data through board symmetries
-   + Stop OMP threads rejoining, make thread 0 do the single-threaded parts
 */
 
 
@@ -115,3 +114,6 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
   return PyTuple_Pack(3, states_arr, probs_arr, scores_arr);
 }
 
+
+
+void mak_opponent_move

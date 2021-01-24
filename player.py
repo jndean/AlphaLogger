@@ -72,13 +72,13 @@ class MCTSPlayer(Player):
 
 def RandomMCTSPlayer(**kwargs):
     return MCTSPlayer(
-        uniform_inference, 
+        uniform_inference,
         **kwargs
     )
 
 
 def AlphaLoggerPlayer(model, **kwargs):
     return MCTSPlayer(
-        lambda x: tuple(model.predict(x)), 
+        lambda x: tuple(model.predict(x)),
         **kwargs
     )

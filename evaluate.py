@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 
 import core
+from model import load_model
 import player
 
 
@@ -58,10 +59,15 @@ def _speed_job(*args):
 if __name__ == '__main__':
 
     players = [
-        player.RandomPlayer(name="Random"),
+        #player.RandomPlayer(name="Random"),
         player.RandomMCTSPlayer(name="Random MCTS", num_simulations=50),
+        player.AlphaLoggerPlayer(
+            model=load_model("checkpoints/epoch15.h5"),
+            name="AlphaLogger",
+            num_simulations=50
+        ),
     ]
-    num_matches = 100
+    num_matches = 10
     max_turns = 50
 
     scores = play_matches(players, num_matches, max_turns)
