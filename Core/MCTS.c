@@ -284,7 +284,7 @@ int MCTS_choose_move_greedy(MCTS* mcts) {
 static double dirichlet_alphas[NUM_MOVES];
 __attribute__((constructor)) 
 void __initialize_dirichlet_alphas() {
-    for (int i = 0; i < NUM_MOVES; ++i) dirichlet_alphas[i] = 1;
+    for (int i = 0; i < NUM_MOVES; ++i) dirichlet_alphas[i] = 10/26;
 }
 
 int MCTS_choose_move_exploratory(MCTS* mcts) {
