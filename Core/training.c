@@ -114,6 +114,3 @@ PyObject* self_play(PyObject* inference_method, int num_samples, int num_simulat
   return PyTuple_Pack(3, states_arr, probs_arr, scores_arr);
 }
 
-
-
-void mak_opponent_move

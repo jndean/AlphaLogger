@@ -123,26 +123,29 @@ PyLoggerState_domove(PyLoggerState *self, PyObject* args, PyObject* keywds)
 static PyObject*
 PyLoggerState_test(PyLoggerState *self, PyObject *Py_UNUSED(ignored)) 
 {
-
-  omp_set_num_threads(8);
-  #pragma omp parallel for
-  for (int game_num = 0; game_num < 1000000; ++game_num) {
-    LoggerState* state = malloc(sizeof(LoggerState));
-    LoggerState_reset(state);
-    for (int move_num = 0; move_num < 25; ++move_num) {
-        int move_idx = -1;
-        for (int i = 0; i < sizeof(state->legal_moves); ++i) {
-            if (state->legal_moves[i] && i % 10 != 8) {
-                move_idx = i;
-                break;
-            }
-        }
-        LoggerState_domove(state, move_idx);
+    long total_moves = 0;
+    omp_set_num_threads(8);
+    
+#pragma omp parallel for reduction(+ : total_moves)
+    for (int game_num = 0; game_num < 1000000; ++game_num) {
+	LoggerState* state = malloc(sizeof(LoggerState));
+	LoggerState_reset(state);
+	for (int move_num = 0; move_num < 25; ++move_num) {
+	    int move_idx = -1;
+	    for (int i = 0; i < sizeof(state->legal_moves); ++i) {
+		if (state->legal_moves[i] && i % 10 != 8) {
+		    move_idx = i;
+		    break;
+		}
+	    }
+	    LoggerState_domove(state, move_idx);
+	    total_moves++;
+	}
+	free(state);
     }
-    free(state);
-  }
-
-  Py_RETURN_NONE;
+    
+    //Py_RETURN_NONE;
+    return PyLong_FromLong(total_moves);
 }
 
 static PyMethodDef PyLoggerState_methods[] = {

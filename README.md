@@ -2,6 +2,8 @@
 
 Implementing the AlphaZero algorithm (the entirely unsupervised iteration of AlphaGo) to learn the beautiful game of Logger. The Logger state-space is a *little* smaller than that of Go or Chess, but then my GPU is a *little* smaller than a V100.
 
+Unlike AlphaZero, AlphaLogger supports more than 2 player, but ending the network value head with a softmax across a vector of player win probabilities which can then be mapped to [-1, 1].
+
 
 
 Proof-of-concept tasks:
@@ -15,15 +17,14 @@ Proof-of-concept tasks:
 
 The proof-of-concept is now complete, but it is sloooow beyond the point of viability.
 
-
-
-Highspeed version Tasks:
+High-speed version Tasks (using the CPython C API):
 
 - [x] An efficient and thread-safe C implementation of Logger 
-- [x] An efficient and thread-safe C implementation of the MCTS
+- [x] An efficient and thread-safe C implementation of the Monte Carlo Tree Search
 - [x] A fully parallelised self-play and training pipeline supporting batching inference over simultaneous games
 
 
 
-The C implementation of Logger can handle >20 million moves per second using 8 threads on a mobile i5-8250U.
-The C implementation of the Monte Carlo Tree Search can do ~1.5 million forward & backward passes of the on the tree per second using the same hardware. This is when using a constant inference function, not the neural network
+The high-speed implementation makes decent use of all available hardware, maxing out any number of CPU threads and achieving ~70% GPU compute utilisation if the neural network is big enough. In an isolated test using 8 threads on a mobile i5-8250U (not the training machine) it can make >20 million Logger moves per second or  run ~1.5 million forward and backward passes per second on the MCTS (when using random value estimations).
+
+I trained a model for ~15 hrs, performing self-play for 50,000 moves across 128 simultaneous game boards each epoch to generate updated training data, then letting the network back-propagate each sample twice. The resultant model was kinda trash, but did at least defeat another agent using an identical MCTS to enhance a flat probability distribution.
